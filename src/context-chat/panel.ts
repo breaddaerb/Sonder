@@ -1,6 +1,7 @@
 import ContextChatService, { PaperContextStatus } from "./chatService";
 import { canSendDraft } from "./chatMessages";
 import { resolveCurrentPaperContext } from "./paperContext";
+import { renderMessageHTML } from "./render";
 import ContextChatStore from "./storage";
 import { SessionSnapshot, StoredMessage } from "./types";
 
@@ -28,6 +29,7 @@ export class ContextChatPanel {
   private status!: HTMLSpanElement;
   private historyButton!: HTMLButtonElement;
   private newSessionButton!: HTMLButtonElement;
+  private viewModeButton!: HTMLButtonElement;
   private closeButton!: HTMLButtonElement;
   private historyDrawer!: HTMLDivElement;
   private messageList!: HTMLDivElement;
@@ -43,6 +45,7 @@ export class ContextChatPanel {
     paperStatus: PaperContextStatus;
     paperError?: string;
     historyOpen: boolean;
+    viewMode: "raw" | "preview";
     draft: string;
     assistantPreviewText: string;
     snapshot?: SessionSnapshot;
@@ -52,6 +55,7 @@ export class ContextChatPanel {
     loading: false,
     paperStatus: "idle",
     historyOpen: false,
+    viewMode: "raw",
     draft: "",
     assistantPreviewText: "",
   };
@@ -210,6 +214,11 @@ export class ContextChatPanel {
         color: #94a3b8;
         background: #f8fafc;
       }
+      #sonder-context-chat-panel .sonder-action.is-active {
+        background: rgba(29, 78, 216, 0.08);
+        border-color: #93c5fd;
+        color: #1d4ed8;
+      }
       #sonder-context-chat-panel .sonder-send:not(:disabled) {
         background: linear-gradient(135deg, #1f6feb 0%, #7c3aed 100%);
         color: #fff;
@@ -305,10 +314,125 @@ export class ContextChatPanel {
         margin-bottom: 6px;
       }
       #sonder-context-chat-panel .sonder-message-content {
-        white-space: pre-wrap;
         font-size: 14px;
         line-height: 1.6;
         color: #0f172a;
+      }
+      #sonder-context-chat-panel .sonder-message-content.is-plain-text {
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      #sonder-context-chat-panel .sonder-message-content .sonder-raw-markdown {
+        margin: 0;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: #f8fafc;
+        color: #0f172a;
+        border: 1px solid #e2e8f0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+      #sonder-context-chat-panel .sonder-message-content .sonder-raw-markdown code {
+        background: transparent;
+        color: inherit;
+        padding: 0;
+        border-radius: 0;
+        white-space: inherit;
+        font-family: inherit;
+      }
+      #sonder-context-chat-panel .sonder-message-content > :first-child {
+        margin-top: 0;
+      }
+      #sonder-context-chat-panel .sonder-message-content > :last-child {
+        margin-bottom: 0;
+      }
+      #sonder-context-chat-panel .sonder-message-content p,
+      #sonder-context-chat-panel .sonder-message-content ul,
+      #sonder-context-chat-panel .sonder-message-content ol,
+      #sonder-context-chat-panel .sonder-message-content pre,
+      #sonder-context-chat-panel .sonder-message-content blockquote,
+      #sonder-context-chat-panel .sonder-message-content table {
+        margin: 0 0 0.9em;
+      }
+      #sonder-context-chat-panel .sonder-message-content ul,
+      #sonder-context-chat-panel .sonder-message-content ol {
+        padding-left: 1.4em;
+      }
+      #sonder-context-chat-panel .sonder-message-content pre {
+        overflow: auto;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: #0f172a;
+        color: #e2e8f0;
+      }
+      #sonder-context-chat-panel .sonder-message-content pre code {
+        background: transparent;
+        color: inherit;
+        padding: 0;
+        border-radius: 0;
+        white-space: pre;
+      }
+      #sonder-context-chat-panel .sonder-message-content code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.92em;
+        background: #e2e8f0;
+        color: #0f172a;
+        padding: 0.12em 0.35em;
+        border-radius: 6px;
+      }
+      #sonder-context-chat-panel .sonder-message-content blockquote {
+        border-left: 3px solid #93c5fd;
+        margin-left: 0;
+        padding-left: 12px;
+        color: #334155;
+      }
+      #sonder-context-chat-panel .sonder-message-content table {
+        border-collapse: collapse;
+        width: 100%;
+        display: block;
+        overflow: auto;
+      }
+      #sonder-context-chat-panel .sonder-message-content th,
+      #sonder-context-chat-panel .sonder-message-content td {
+        border: 1px solid #cbd5e1;
+        padding: 8px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+      #sonder-context-chat-panel .sonder-message-content th {
+        background: #f8fafc;
+      }
+      #sonder-context-chat-panel .sonder-message-content .sonder-math-block {
+        margin: 0 0 0.9em;
+        overflow-x: auto;
+        padding: 8px 0;
+      }
+      #sonder-context-chat-panel .sonder-message-content .sonder-math-block .katex,
+      #sonder-context-chat-panel .sonder-message-content .sonder-inline-math .katex {
+        color: #0f172a;
+      }
+      #sonder-context-chat-panel .sonder-message-content .sonder-math-block math[display="block"] {
+        display: block;
+      }
+      #sonder-context-chat-panel .sonder-message-content .sonder-inline-math {
+        display: inline-block;
+        padding: 0 0.15em;
+        vertical-align: middle;
+      }
+      #sonder-context-chat-panel .sonder-message-content math {
+        font-size: 1.05em;
+      }
+      #sonder-context-chat-panel .sonder-message-content .sonder-plain-fallback {
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: #f8fafc;
+        color: #0f172a;
+        border: 1px solid #e2e8f0;
       }
       #sonder-context-chat-panel .sonder-citations {
         display: flex;
@@ -432,6 +556,13 @@ export class ContextChatPanel {
       void this.createNewSession();
     });
 
+    const viewModeButton = createHTML(doc, "button");
+    viewModeButton.className = "sonder-action";
+    viewModeButton.addEventListener("click", () => {
+      this.state.viewMode = this.state.viewMode == "raw" ? "preview" : "raw";
+      this.render();
+    });
+
     const closeButton = createHTML(doc, "button");
     closeButton.className = "sonder-close";
     closeButton.textContent = "Close";
@@ -441,7 +572,7 @@ export class ContextChatPanel {
       this.render();
     });
 
-    actionRow.append(historyButton, newSessionButton, closeButton);
+    actionRow.append(historyButton, newSessionButton, viewModeButton, closeButton);
 
     const historyDrawer = createHTML(doc, "div");
     historyDrawer.className = "sonder-history-drawer";
@@ -497,6 +628,7 @@ export class ContextChatPanel {
     this.status = status;
     this.historyButton = historyButton;
     this.newSessionButton = newSessionButton;
+    this.viewModeButton = viewModeButton;
     this.closeButton = closeButton;
     this.historyDrawer = historyDrawer;
     this.messageList = messageList;
@@ -744,6 +876,47 @@ export class ContextChatPanel {
     }
   }
 
+  private setRawMessageContent(node: HTMLDivElement, rawText: string) {
+    node.classList.add("is-plain-text");
+    node.replaceChildren();
+    const pre = createHTML(node.ownerDocument, "pre");
+    pre.className = "sonder-raw-markdown";
+    const code = createHTML(node.ownerDocument, "code");
+    code.textContent = rawText;
+    pre.appendChild(code);
+    node.appendChild(pre);
+  }
+
+  private setRenderedMessageContent(node: HTMLDivElement, rawText: string) {
+    node.classList.remove("is-plain-text");
+    node.replaceChildren();
+    try {
+      const html = renderMessageHTML(rawText);
+      const parser = new DOMParser();
+      const parsed = parser.parseFromString(`<div>${html}</div>`, "text/html");
+      const wrapper = parsed.body.firstElementChild;
+      if (!wrapper) {
+        this.setRawMessageContent(node, rawText);
+        return;
+      }
+      const fragment = node.ownerDocument.createDocumentFragment();
+      Array.from(wrapper.childNodes).forEach((child) => {
+        fragment.appendChild(node.ownerDocument.importNode(child as Node, true));
+      });
+      node.appendChild(fragment);
+      const visibleText = (node.textContent || "").replace(/\s+/g, " ").trim();
+      if (rawText.trim().length > 0 && visibleText.length == 0) {
+        this.setRawMessageContent(node, rawText);
+      }
+    } catch {
+      this.setRawMessageContent(node, rawText);
+    }
+  }
+
+  private shouldRenderPreview(message: StoredMessage) {
+    return this.state.viewMode == "preview" && message.role == "assistant" && message.id != "assistant-preview";
+  }
+
   private getRenderedMessages(messages: StoredMessage[]) {
     if (!this.state.assistantPreviewText || !this.state.snapshot) {
       return messages;
@@ -782,7 +955,7 @@ export class ContextChatPanel {
       copy2.className = "sonder-empty-copy";
       copy2.textContent = this.state.error
         ? "Once a PDF reader tab is active, click Chat again and Sonder will resolve the paper context explicitly."
-        : "Current limitation: the panel now retrieves relevant paper chunks for grounding, but citations/source-jump UI is still coming in a later milestone.";
+        : "Assistant output is shown as raw markdown by default. Use the Preview button in the header to switch rendered preview on and off.";
 
       empty.append(title, copy, copy2);
       this.messageList.appendChild(empty);
@@ -803,7 +976,11 @@ export class ContextChatPanel {
 
       const content = createHTML(doc, "div");
       content.className = "sonder-message-content";
-      content.textContent = message.content;
+      if (this.shouldRenderPreview(message)) {
+        this.setRenderedMessageContent(content, message.content);
+      } else {
+        this.setRawMessageContent(content, message.content);
+      }
 
       node.append(role, content);
 
@@ -846,12 +1023,12 @@ export class ContextChatPanel {
       : this.state.loadingPhase == "sending"
         ? this.state.paperStatus == "preparing"
           ? "Preparing paper context, then generating a grounded response…"
-          : "Generating response with the current provider…"
+          : `Generating response with the current provider… View mode: ${this.state.viewMode == "raw" ? "Raw Markdown" : "Preview"}`
         : this.state.paperStatus == "preparing"
           ? "Preparing retrievable paper context… You can still press Send."
           : this.state.paperStatus == "failed"
             ? `Paper preparation failed: ${this.state.paperError || "unknown error"}`
-            : "Enter to send · Shift+Enter for newline";
+            : `Enter to send · Shift+Enter for newline · View mode: ${this.state.viewMode == "raw" ? "Raw Markdown" : "Preview"}`;
     this.sendButton.disabled = !hasContext || this.state.loading || !canSendDraft(this.state.draft);
     this.sendButton.textContent = this.state.loadingPhase == "sending" ? "Sending…" : "Send";
   }
@@ -899,6 +1076,12 @@ export class ContextChatPanel {
 
     this.historyButton.disabled = !hasContext || this.state.loading;
     this.newSessionButton.disabled = !hasContext || this.state.loading;
+    this.viewModeButton.disabled = false;
+    this.viewModeButton.textContent = this.state.viewMode == "raw" ? "Preview" : "Raw Markdown";
+    this.viewModeButton.title = this.state.viewMode == "raw"
+      ? "Render assistant markdown for preview"
+      : "Show the raw markdown source for assistant messages";
+    this.viewModeButton.classList.toggle("is-active", this.state.viewMode == "preview");
     this.closeButton.disabled = false;
 
     this.renderHistory();

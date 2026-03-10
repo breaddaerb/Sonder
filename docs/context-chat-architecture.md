@@ -36,6 +36,8 @@ Current rewrite modules:
   - panel-facing send/receive orchestration, paper preparation state, and message persistence
 - `src/context-chat/paperRetrieval.ts`
   - active-reader PDF parsing, chunking, lexical retrieval, and grounded prompt construction
+- `src/context-chat/render.ts`
+  - safe markdown rendering and readable code/math formatting for optional panel preview mode
 - `src/context-chat/panel.ts`
   - global right-side panel shell and header/history/composer UI
 - `src/context-chat/service.ts`
@@ -66,6 +68,8 @@ Implemented so far:
 - background paper preparation from the active PDF reader
 - chunked paper retrieval and prompt grounding in the new panel transport path
 - lightweight citation chips on assistant messages with PDF page jump behavior
+- raw-markdown-first assistant output with a header toggle between `Raw Markdown` and rendered `Preview`
+- optional preview rendering for readable headings, lists, tables, code blocks, and KaTeX/MathML-based math rendering after streaming completes
 
 Still later:
 

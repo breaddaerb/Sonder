@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { canSendDraft, toChatHistory } from "../src/context-chat/chatMessages";
 import { buildPaperGroundedUserMessage, createPaperChunkCitations, selectRelevantPaperChunks } from "../src/context-chat/paperRetrieval";
+import { renderMessageHTML } from "../src/context-chat/render";
 import {
   createPaperContextId,
   createSessionId,
@@ -59,7 +60,36 @@ const groundedPrompt = buildPaperGroundedUserMessage({
   chunks: relevantChunks,
 });
 assert.match(groundedPrompt, /Retrieved paper context:/);
+assert.match(groundedPrompt, /markdown/);
+assert.match(groundedPrompt, /fenced code blocks/);
+assert.match(groundedPrompt, /\$\.\.\.\$/);
+assert.match(groundedPrompt, /\$\$\.\.\.\$\$/);
 assert.match(groundedPrompt, /p\.2/);
 assert.match(groundedPrompt, /User question:/);
+
+const renderedHTML = renderMessageHTML([
+  "# Heading",
+  "",
+  "Inline math: $E = mc^2$ and \\(a+b\\)",
+  "",
+  "```ts",
+  "const answer = 42;",
+  "```",
+  "",
+  "$$",
+  "a^2 + b^2 = c^2",
+  "$$",
+  "",
+  "\\[",
+  "\\int_0^1 x^2 dx",
+  "\\]",
+].join("\n"));
+assert.match(renderedHTML, /<h1>Heading<\/h1>/);
+assert.match(renderedHTML, /sonder-inline-math/);
+assert.match(renderedHTML, /language-ts/);
+assert.match(renderedHTML, /sonder-math-block/);
+assert.match(renderedHTML, /<math/);
+assert.match(renderMessageHTML("plain text"), /plain text/);
+assert.equal(typeof renderMessageHTML(""), "string");
 
 console.log("context-chat model tests passed");

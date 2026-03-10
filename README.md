@@ -97,10 +97,17 @@ Current behavior:
 - responses are now grounded with retrieved paper context in the panel transport path
 - assistant messages show lightweight citation chips for retrieved paper chunks
 - clicking a citation chip jumps back to the relevant PDF page
+- assistant output is shown as raw markdown by default
+- streaming stays in raw markdown form for stability
+- a header toggle switches between `Raw Markdown` and rendered `Preview`
+- preview mode renders headings, lists, tables, code blocks, and math expressions after streaming completes
+- preview-mode math now supports `$...$`, `$$...$$`, `\(...\)`, and `\[...\]`
+- raw markdown mode stays easy to copy into tools like Notion
 
 Current limitation:
 
 - citation jumping currently targets the relevant PDF page, not a fine-grained paragraph/box location yet
+- math preview quality depends on the model emitting explicit math delimiters consistently, though the panel now nudges it toward `$...$` / `$$...$$`
 - retrieval is currently a simple chunked lexical-ranking implementation, not the final retrieval stack yet
 - the legacy shortcut/command UI remains available as a fallback while the rewrite continues
 

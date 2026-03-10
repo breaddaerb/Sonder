@@ -160,6 +160,7 @@ Main direction: large right-side docked chat panel.
 - [x] Add header actions
   - [x] `New Session`
   - [x] `History`
+  - [x] `Raw Markdown` / `Preview`
   - [ ] `Clear Current Session`
   - [ ] optional `Settings`
 - [x] Add status indicator
@@ -170,12 +171,13 @@ Main direction: large right-side docked chat panel.
 ### 6.3 Message area
 - [x] Large scrollable message list
 - [x] User / assistant message separation
-- [ ] Markdown rendering
-  - [ ] Improve code-block readability in panel output
-  - [ ] Keep rendered output easy to copy/paste into Notion
+- [x] Markdown rendering
+  - [x] Improve code-block readability in panel output
+  - [x] Keep rendered output easy to copy/paste into Notion
+  - [x] Support raw-markdown / preview toggle instead of forcing preview only
 - [x] Long-answer friendly layout
-- [ ] Citation/source chip UI
-- [ ] Clicking citation jumps to source
+- [x] Citation/source chip UI
+- [x] Clicking citation jumps to source
 
 ### 6.4 Composer
 - [x] Multiline textarea
@@ -278,11 +280,11 @@ A core value of paper chat is being able to jump back to source.
 
 Current inherited baseline disables the old MathJax plugin path because it broke Zotero sandbox startup.
 
-- [ ] Decide safe formula rendering strategy for Sonder
+- [x] Decide safe formula rendering strategy for Sonder
 - [ ] Confirm chosen strategy does not break plugin startup
 - [ ] Test long technical/math-heavy answers in the new panel
-- [ ] Improve equation readability so outputs do not fall back to ugly raw formula text where avoidable
-- [ ] Prefer a markdown-like rendering/copy format that stays easy to paste into Notion
+- [x] Improve equation readability so outputs do not fall back to ugly raw formula text where avoidable
+- [x] Prefer a markdown-like rendering/copy format that stays easy to paste into Notion
 
 This is important because one major product requirement is explaining paper formulas/principles in long outputs.
 
