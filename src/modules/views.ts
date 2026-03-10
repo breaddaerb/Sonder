@@ -1209,7 +1209,7 @@ export default class Views {
         alignItems: "center",
         justifyContent: "center",
       }
-    }, this.outputContainer)
+    }, this.outputContainer) as Element
     docs.forEach((doc: Document, index: number) => {
       ztoolkit.UI.appendElement({
         namespace: "html",
@@ -1319,7 +1319,7 @@ export default class Views {
               {
                 type: "mouseenter",
                 listener: function () {
-                  nodes.forEach(e => e.classList.remove("selected"))
+                  nodes.forEach((e: Element) => e.classList.remove("selected"))
                   // @ts-ignore
                   this.classList.add("selected")
                   currentIndex = i
@@ -1354,7 +1354,7 @@ export default class Views {
         }
         return arr
       })() as any
-    }, document.documentElement)
+    }, document.documentElement) as HTMLDivElement
     
     const winRect = document.documentElement.getBoundingClientRect()
     const nodeRect = menuNode.getBoundingClientRect()
@@ -1364,7 +1364,7 @@ export default class Views {
       menuNode.style.bottom = "0px"
     }
     // menuNode.querySelector(".menu-item:first-child")?.classList.add("selected")
-    const nodes = menuNode.querySelectorAll(".menu-item")
+    const nodes = menuNode.querySelectorAll(".menu-item") as NodeListOf<Element>
     nodes[0].classList.add("selected")
     let currentIndex = 0
     this.inputContainer.querySelector("input")?.blur()
@@ -1387,7 +1387,7 @@ export default class Views {
       } else if (event.code == "Escape") {
         removeNode()
       }
-      nodes.forEach(e => e.classList.remove("selected"))
+      nodes.forEach((e: Element) => e.classList.remove("selected"))
       nodes[currentIndex].classList.add("selected")
     }
     document.addEventListener("keydown", keyDownHandler)

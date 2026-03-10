@@ -40,6 +40,7 @@ That working base will be used for the next implementation stage.
 
 - [`docs/migration-plan.md`](docs/migration-plan.md)
 - [`docs/context-chat-spec-v0.1.md`](docs/context-chat-spec-v0.1.md)
+- [`docs/context-chat-architecture.md`](docs/context-chat-architecture.md)
 - [`docs/codex-oauth.md`](docs/codex-oauth.md)
 - [`docs/plugin-loading-fix.md`](docs/plugin-loading-fix.md)
 
@@ -74,6 +75,32 @@ Useful commands in the current baseline include:
 /provider openai-codex
 /login
 /report
+```
+
+## Experimental M1 panel shell
+
+The first rewrite milestone now introduces an experimental panel shell alongside the preserved legacy popup UI.
+
+Current M1 behavior:
+
+- a visible `Chat` launcher button is mounted in the Zotero main window
+- clicking it with an active PDF reader tab opens a large right-side panel
+- the panel resolves explicit `Paper` context from the current PDF
+- the latest saved session for that paper is restored automatically
+- `New Session` creates another persisted session for the same paper
+- `History` lists saved sessions for the current paper context
+
+Current limitation:
+
+- the new panel's composer is mounted, but message transport is not wired yet in this milestone
+- the legacy shortcut/command UI remains available as the working fallback for actual chat transport while the rewrite continues
+
+## Tests
+
+```bash
+npm test
+npm run tsc
+npm run build-dev
 ```
 
 ## Immediate migration acceptance criteria

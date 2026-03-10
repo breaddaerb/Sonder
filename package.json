@@ -25,7 +25,8 @@
     "restart-prod": "npm run build-prod && npm run stop && npm run start",
     "restart": "npm run restart-dev",
     "release": "release-it",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node scripts/test-context-chat.js",
+    "test:context-chat": "node scripts/test-context-chat.js"
   },
   "repository": {
     "type": "git",
