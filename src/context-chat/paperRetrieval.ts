@@ -1,3 +1,5 @@
+import { Citation } from "./types";
+
 export interface PaperChunk {
   id: string;
   page: number;
@@ -126,6 +128,17 @@ export function selectRelevantPaperChunks(queryText: string, chunks: PaperChunk[
     .slice(0, maxChunks)
     .map((entry) => entry.chunk)
     .sort((a, b) => a.page - b.page || a.id.localeCompare(b.id));
+}
+
+export function createPaperChunkCitations(chunks: PaperChunk[]): Citation[] {
+  return chunks.map((chunk, index) => ({
+    id: chunk.id,
+    label: `[${index + 1}] ${chunk.label}`,
+    sourceType: "paper",
+    target: `page:${chunk.page}`,
+    page: chunk.page,
+    preview: chunk.content.slice(0, 220),
+  }));
 }
 
 export function buildPaperGroundedUserMessage(args: {

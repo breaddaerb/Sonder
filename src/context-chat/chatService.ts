@@ -4,6 +4,7 @@ import ContextChatStore from "./storage";
 import { toChatHistory } from "./chatMessages";
 import {
   buildPaperGroundedUserMessage,
+  createPaperChunkCitations,
   PreparedPaperContext,
   readCurrentReaderPaperChunks,
   selectRelevantPaperChunks,
@@ -142,6 +143,7 @@ export class ContextChatService {
     snapshot = await this.store.appendMessage(sessionId, "assistant", result.content, {
       provider: result.provider,
       model: result.model,
+      citations: createPaperChunkCitations(relevantChunks),
     });
     if (!snapshot) {
       throw new Error("Session not found while saving the assistant response.");

@@ -95,10 +95,12 @@ Current behavior:
 - multi-turn user/assistant messages are persisted per session
 - the panel prepares chunked paper context from the active PDF and retrieves relevant chunks per question
 - responses are now grounded with retrieved paper context in the panel transport path
+- assistant messages show lightweight citation chips for retrieved paper chunks
+- clicking a citation chip jumps back to the relevant PDF page
 
 Current limitation:
 
-- citation chips/source-jump UI are not wired into the new panel yet
+- citation jumping currently targets the relevant PDF page, not a fine-grained paragraph/box location yet
 - retrieval is currently a simple chunked lexical-ranking implementation, not the final retrieval stack yet
 - the legacy shortcut/command UI remains available as a fallback while the rewrite continues
 

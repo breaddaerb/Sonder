@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { canSendDraft, toChatHistory } from "../src/context-chat/chatMessages";
-import { buildPaperGroundedUserMessage, selectRelevantPaperChunks } from "../src/context-chat/paperRetrieval";
+import { buildPaperGroundedUserMessage, createPaperChunkCitations, selectRelevantPaperChunks } from "../src/context-chat/paperRetrieval";
 import {
   createPaperContextId,
   createSessionId,
@@ -47,6 +47,11 @@ const relevantChunks = selectRelevantPaperChunks("transformer attention", [
   { id: "c3", page: 3, label: "p.3", content: "Results and ablations are reported for sequence modeling." },
 ]);
 assert.equal(relevantChunks.some((chunk) => chunk.id == "c2"), true);
+
+const citations = createPaperChunkCitations(relevantChunks);
+assert.equal(citations[0].sourceType, "paper");
+assert.equal(typeof citations[0].page, "number");
+assert.match(citations[0].target || "", /^page:/);
 
 const groundedPrompt = buildPaperGroundedUserMessage({
   title: "Attention Paper",

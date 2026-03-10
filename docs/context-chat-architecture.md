@@ -65,10 +65,11 @@ Implemented so far:
 - basic multi-turn send/receive using the existing provider transport stack
 - background paper preparation from the active PDF reader
 - chunked paper retrieval and prompt grounding in the new panel transport path
+- lightweight citation chips on assistant messages with PDF page jump behavior
 
 Still later:
 
-- citations/source-jump UI in the new panel
+- finer-grained source jumps beyond page-level navigation
 - richer/final retrieval strategy beyond the initial lexical chunk ranking
 - item + paper mode
 

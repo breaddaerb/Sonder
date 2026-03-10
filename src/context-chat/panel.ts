@@ -310,6 +310,27 @@ export class ContextChatPanel {
         line-height: 1.6;
         color: #0f172a;
       }
+      #sonder-context-chat-panel .sonder-citations {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      #sonder-context-chat-panel .sonder-citation-chip {
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        background: #f8fafc;
+        color: #334155;
+        font-size: 12px;
+        line-height: 1.3;
+        padding: 6px 10px;
+        cursor: pointer;
+      }
+      #sonder-context-chat-panel .sonder-citation-chip:hover {
+        background: #eff6ff;
+        border-color: #93c5fd;
+        color: #1d4ed8;
+      }
       #sonder-context-chat-panel .sonder-composer {
         border-top: 1px solid #e5e7eb;
         background: #ffffff;
@@ -696,6 +717,33 @@ export class ContextChatPanel {
     this.historyDrawer.append(meta, list);
   }
 
+  private async jumpToCitation(target?: string, page?: number) {
+    try {
+      const resolvedPage = page || (target?.startsWith("page:") ? Number(target.slice(5)) : 0);
+      if (!resolvedPage) {
+        return;
+      }
+      const reader = (Zotero.Reader.getByTabID(Zotero_Tabs.selectedID) || await ztoolkit.Reader.getReader()) as _ZoteroTypes.ReaderInstance;
+      if (!reader?._iframeWindow) {
+        throw new Error("No active PDF reader is available for citation jump.");
+      }
+      (reader._iframeWindow as any).wrappedJSObject.eval(`
+        (() => {
+          const viewer = PDFViewerApplication.pdfViewer;
+          PDFViewerApplication.page = ${resolvedPage};
+          viewer.scrollPageIntoView({
+            pageNumber: ${resolvedPage},
+            destArray: [null, { name: "XYZ" }, 0, null, null],
+            allowNegativeOffset: false,
+            ignoreDestinationZoom: false
+          });
+        })()
+      `);
+    } catch (error: any) {
+      Zotero.logError(error);
+    }
+  }
+
   private getRenderedMessages(messages: StoredMessage[]) {
     if (!this.state.assistantPreviewText || !this.state.snapshot) {
       return messages;
@@ -758,6 +806,25 @@ export class ContextChatPanel {
       content.textContent = message.content;
 
       node.append(role, content);
+
+      if (message.citations?.length) {
+        const citations = createHTML(doc, "div");
+        citations.className = "sonder-citations";
+        message.citations.forEach((citation) => {
+          const chip = createHTML(doc, "button");
+          chip.className = "sonder-citation-chip";
+          chip.textContent = citation.label;
+          if (citation.preview) {
+            chip.title = citation.preview;
+          }
+          chip.addEventListener("click", () => {
+            void this.jumpToCitation(citation.target, citation.page);
+          });
+          citations.appendChild(chip);
+        });
+        node.appendChild(citations);
+      }
+
       this.messageList.appendChild(node);
     });
   }

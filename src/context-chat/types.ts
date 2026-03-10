@@ -5,6 +5,8 @@ export interface Citation {
   label: string;
   sourceType: "paper" | "item";
   target?: string;
+  page?: number;
+  preview?: string;
 }
 
 export interface StoredContext {

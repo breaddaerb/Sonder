@@ -263,12 +263,14 @@ The new UI/context system should reuse the already working backend pieces.
 
 A core value of paper chat is being able to jump back to source.
 
-- [ ] Preserve existing source-jump capability where possible
-- [ ] Design citation chip format in the new panel
-- [ ] Clicking a citation should:
-  - [ ] jump to PDF region for paper chunks
+- [x] Preserve existing source-jump capability where possible
+- [x] Design citation chip format in the new panel
+- [x] Clicking a citation should:
+  - [x] jump to PDF region for paper chunks
+  - [ ] jump to a finer-grained paragraph/box region instead of page-level only
+  - [ ] visually highlight/mark the relevant cited content after jump
   - [ ] select Zotero item for item sources where appropriate
-- [ ] Make citations visible but not visually noisy
+- [x] Make citations visible but not visually noisy
 
 ---
 
