@@ -1,6 +1,6 @@
 # Sonder TODO
 
-Status: M1 foundation in progress  
+Status: paper panel chat in progress  
 Last updated: 2026-03-10
 
 This file turns `docs/context-chat-spec-v0.1.md` into an implementation-oriented task list.
@@ -171,13 +171,13 @@ Main direction: large right-side docked chat panel.
 - [x] Large scrollable message list
 - [x] User / assistant message separation
 - [ ] Markdown rendering
-- [ ] Long-answer friendly layout
+- [x] Long-answer friendly layout
 - [ ] Citation/source chip UI
 - [ ] Clicking citation jumps to source
 
 ### 6.4 Composer
 - [x] Multiline textarea
-- [ ] `Enter` send / `Shift+Enter` newline
+- [x] `Enter` send / `Shift+Enter` newline
 - [x] Send button
 - [x] Context hint text
   - [x] `Chatting with current paper`
@@ -248,12 +248,12 @@ Optional-but-likely-later:
 
 The new UI/context system should reuse the already working backend pieces.
 
-- [ ] Define chat service boundary between UI and provider transports
-- [ ] Reuse current provider selection logic
-- [ ] Reuse Codex OAuth flow
-- [ ] Reuse Codex request path/body logic where sensible
-- [ ] Reuse OpenAI API mode where sensible
-- [ ] Preserve `/report`-style diagnostics somewhere, even if UI changes later
+- [x] Define chat service boundary between UI and provider transports
+- [x] Reuse current provider selection logic
+- [x] Reuse Codex OAuth flow
+- [x] Reuse Codex request path/body logic where sensible
+- [x] Reuse OpenAI API mode where sensible
+- [x] Preserve `/report`-style diagnostics somewhere, even if UI changes later
 
 ---
 
@@ -326,7 +326,7 @@ Recommended sequence for happy coding:
 ### Phase 3: paper context
 - [x] paper context resolver
 - [x] open/create session
-- [ ] send/receive basic messages in paper context
+- [x] send/receive basic messages in paper context
 
 ### Phase 4: item + paper context
 - [ ] selected item detection

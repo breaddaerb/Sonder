@@ -1,8 +1,10 @@
 import ContextChatPanel from "./panel";
+import ContextChatService from "./chatService";
 import ContextChatStore from "./storage";
 
 export class ContextChatFeature {
   private readonly store = new ContextChatStore();
+  private readonly chatService = new ContextChatService(this.store);
   private readonly panels = new Map<Window, ContextChatPanel>();
 
   public async start() {
@@ -17,7 +19,7 @@ export class ContextChatFeature {
       return;
     }
     await this.store.ready();
-    const panel = new ContextChatPanel(window, this.store);
+    const panel = new ContextChatPanel(window, this.store, this.chatService);
     panel.install();
     this.panels.set(window, panel);
   }

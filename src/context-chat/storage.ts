@@ -1,12 +1,15 @@
 import { config } from "../../package.json";
 import { getCurrentModel, getProvider } from "../modules/provider";
 import {
+  Citation,
   ContextChatStoreData,
   PaperContextDescriptor,
   SessionSnapshot,
   StoredContext,
+  StoredMessage,
   StoredSession,
   createEmptyStoreData,
+  createMessageId,
   createPaperContextId,
   createSessionId,
   createSessionTitle,
@@ -108,6 +111,22 @@ export class ContextChatStore {
     return session;
   }
 
+  private touchSession(
+    context: StoredContext,
+    session: StoredSession,
+    now: number,
+    options: { provider?: string; model?: string } = {}
+  ) {
+    context.updatedAt = now;
+    session.updatedAt = now;
+    if (options.provider) {
+      session.provider = options.provider;
+    }
+    if (options.model) {
+      session.model = options.model;
+    }
+  }
+
   public async getOrCreatePaperSession(descriptor: PaperContextDescriptor): Promise<SessionSnapshot> {
     await this.ready();
     const now = Date.now();
@@ -127,7 +146,7 @@ export class ContextChatStore {
     const sessions = this.getSessionsForContext(contextId);
     const latestSession = getLatestSession(sessions);
     const session = latestSession || this.createSession(this.cache.contexts[contextId], sessions, now);
-    session.updatedAt = now;
+    this.touchSession(this.cache.contexts[contextId], session, now);
     this.cache.sessions[session.id] = session;
     await this.persist();
     return this.buildSnapshot(this.cache.contexts[contextId], session);
@@ -140,9 +159,9 @@ export class ContextChatStore {
       return undefined;
     }
     const now = Date.now();
-    context.updatedAt = now;
     const sessions = this.getSessionsForContext(contextId);
     const session = this.createSession(context, sessions, now);
+    this.touchSession(context, session, now);
     await this.persist();
     return this.buildSnapshot(context, session);
   }
@@ -157,6 +176,37 @@ export class ContextChatStore {
     if (!context) {
       return undefined;
     }
+    return this.buildSnapshot(context, session);
+  }
+
+  public async appendMessage(
+    sessionId: string,
+    role: StoredMessage["role"],
+    content: string,
+    options: { citations?: Citation[]; provider?: string; model?: string; createdAt?: number } = {}
+  ): Promise<SessionSnapshot | undefined> {
+    await this.ready();
+    const session = this.cache.sessions[sessionId];
+    if (!session) {
+      return undefined;
+    }
+    const context = this.cache.contexts[session.contextId];
+    if (!context) {
+      return undefined;
+    }
+    const now = options.createdAt || Date.now();
+    const message: StoredMessage = {
+      id: createMessageId(now),
+      sessionId,
+      role,
+      content,
+      createdAt: now,
+      citations: options.citations,
+    };
+    this.cache.messages[sessionId] ||= [];
+    this.cache.messages[sessionId].push(message);
+    this.touchSession(context, session, now, options);
+    await this.persist();
     return this.buildSnapshot(context, session);
   }
 

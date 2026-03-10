@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { canSendDraft, toChatHistory } from "../src/context-chat/chatMessages";
 import {
   createPaperContextId,
   createSessionId,
@@ -25,5 +26,18 @@ assert.deepEqual(sortSessionsByUpdatedAt(sessions).map((session) => session.id),
   "older",
 ]);
 assert.equal(getLatestSession(sessions)?.id, "latest");
+assert.equal(canSendDraft("hello"), true);
+assert.equal(canSendDraft("   \n  "), false);
+assert.deepEqual(
+  toChatHistory([
+    { id: "m1", sessionId: "s1", role: "system", content: "ignore", createdAt: 1 },
+    { id: "m2", sessionId: "s1", role: "user", content: "question", createdAt: 2 },
+    { id: "m3", sessionId: "s1", role: "assistant", content: "answer", createdAt: 3 },
+  ]),
+  [
+    { role: "user", content: "question" },
+    { role: "assistant", content: "answer" },
+  ]
+);
 
 console.log("context-chat model tests passed");

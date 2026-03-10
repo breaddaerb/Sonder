@@ -1,5 +1,7 @@
-import ContextChatStore from "./storage";
+import ContextChatService from "./chatService";
+import { canSendDraft } from "./chatMessages";
 import { resolveCurrentPaperContext } from "./paperContext";
+import ContextChatStore from "./storage";
 import { SessionSnapshot, StoredMessage } from "./types";
 
 const HTML_NS = "http://www.w3.org/1999/xhtml";
@@ -31,21 +33,31 @@ export class ContextChatPanel {
   private messageList!: HTMLDivElement;
   private composerHint!: HTMLDivElement;
   private composerInput!: HTMLTextAreaElement;
+  private composerNote!: HTMLDivElement;
   private sendButton!: HTMLButtonElement;
 
   private state: {
     visible: boolean;
     loading: boolean;
+    loadingPhase?: "opening" | "sending";
     historyOpen: boolean;
+    draft: string;
+    assistantPreviewText: string;
     snapshot?: SessionSnapshot;
     error?: string;
   } = {
     visible: false,
     loading: false,
     historyOpen: false,
+    draft: "",
+    assistantPreviewText: "",
   };
 
-  constructor(private readonly ownerWindow: Window, private readonly store: ContextChatStore) {}
+  constructor(
+    private readonly ownerWindow: Window,
+    private readonly store: ContextChatStore,
+    private readonly chatService: ContextChatService,
+  ) {}
 
   public install() {
     const doc = this.ownerWindow.document;
@@ -195,6 +207,11 @@ export class ContextChatPanel {
         color: #94a3b8;
         background: #f8fafc;
       }
+      #sonder-context-chat-panel .sonder-send:not(:disabled) {
+        background: linear-gradient(135deg, #1f6feb 0%, #7c3aed 100%);
+        color: #fff;
+        border-color: transparent;
+      }
       #sonder-context-chat-panel .sonder-history-drawer {
         display: none;
         flex-direction: column;
@@ -264,6 +281,17 @@ export class ContextChatPanel {
         border-radius: 16px;
         background: #fff;
         border: 1px solid #e2e8f0;
+      }
+      #sonder-context-chat-panel .sonder-message.is-user {
+        background: #eff6ff;
+        border-color: #bfdbfe;
+        margin-left: 48px;
+      }
+      #sonder-context-chat-panel .sonder-message.is-assistant {
+        margin-right: 24px;
+      }
+      #sonder-context-chat-panel .sonder-message.is-streaming {
+        border-style: dashed;
       }
       #sonder-context-chat-panel .sonder-message-role {
         font-size: 11px;
@@ -407,20 +435,30 @@ export class ContextChatPanel {
 
     const composerInput = createHTML(doc, "textarea");
     composerInput.className = "sonder-composer-input";
-    composerInput.placeholder = "Message sending will be connected in the next milestone.";
+    composerInput.placeholder = "Ask about this paper";
+    composerInput.addEventListener("input", () => {
+      this.state.draft = composerInput.value;
+      this.syncComposerState();
+    });
+    composerInput.addEventListener("keydown", (event) => {
+      if (event.key == "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        void this.handleSend();
+      }
+    });
 
     const composerActions = createHTML(doc, "div");
     composerActions.className = "sonder-composer-actions";
 
     const composerNote = createHTML(doc, "div");
     composerNote.className = "sonder-composer-note";
-    composerNote.textContent = "M1 shell: the composer is mounted, but transport wiring comes next.";
 
     const sendButton = createHTML(doc, "button");
     sendButton.className = "sonder-send";
     sendButton.textContent = "Send";
-    sendButton.disabled = true;
-    sendButton.title = "Message sending will be connected in a later milestone.";
+    sendButton.addEventListener("click", () => {
+      void this.handleSend();
+    });
 
     composerActions.append(composerNote, sendButton);
     composer.append(composerHint, composerInput, composerActions);
@@ -440,19 +478,23 @@ export class ContextChatPanel {
     this.messageList = messageList;
     this.composerHint = composerHint;
     this.composerInput = composerInput;
+    this.composerNote = composerNote;
     this.sendButton = sendButton;
   }
 
   private async openCurrentPaper() {
     this.state.visible = true;
     this.state.loading = true;
+    this.state.loadingPhase = "opening";
     this.state.error = undefined;
     this.state.historyOpen = false;
+    this.state.assistantPreviewText = "";
     this.render();
 
     const paperContext = resolveCurrentPaperContext();
     if (!paperContext) {
       this.state.loading = false;
+      this.state.loadingPhase = undefined;
       this.state.snapshot = undefined;
       this.state.error = "Open a PDF reader tab, then click Chat to start a paper session.";
       this.render();
@@ -462,14 +504,17 @@ export class ContextChatPanel {
     try {
       this.state.snapshot = await this.store.getOrCreatePaperSession(paperContext);
       this.state.loading = false;
+      this.state.loadingPhase = undefined;
       this.state.error = undefined;
     } catch (error: any) {
       this.state.loading = false;
+      this.state.loadingPhase = undefined;
       this.state.snapshot = undefined;
       this.state.error = String(error?.message || error || "Failed to open paper session.");
       Zotero.logError(error);
     }
     this.render();
+    this.focusComposer();
   }
 
   private async createNewSession() {
@@ -478,6 +523,7 @@ export class ContextChatPanel {
       return;
     }
     this.state.loading = true;
+    this.state.loadingPhase = "opening";
     this.render();
     try {
       const snapshot = await this.store.createNewSession(contextId);
@@ -486,17 +532,21 @@ export class ContextChatPanel {
       }
       this.state.historyOpen = false;
       this.state.error = undefined;
+      this.state.assistantPreviewText = "";
     } catch (error: any) {
       Zotero.logError(error);
       this.state.error = "Failed to create a new session.";
     } finally {
       this.state.loading = false;
+      this.state.loadingPhase = undefined;
       this.render();
+      this.focusComposer();
     }
   }
 
   private async loadSession(sessionId: string) {
     this.state.loading = true;
+    this.state.loadingPhase = "opening";
     this.render();
     try {
       const snapshot = await this.store.getSessionSnapshot(sessionId);
@@ -505,12 +555,53 @@ export class ContextChatPanel {
       }
       this.state.historyOpen = false;
       this.state.error = undefined;
+      this.state.assistantPreviewText = "";
     } catch (error: any) {
       Zotero.logError(error);
       this.state.error = "Failed to load session history.";
     } finally {
       this.state.loading = false;
+      this.state.loadingPhase = undefined;
       this.render();
+      this.focusComposer();
+    }
+  }
+
+  private async handleSend() {
+    const snapshot = this.state.snapshot;
+    const content = this.state.draft.trim();
+    if (!snapshot || this.state.loading || !canSendDraft(content)) {
+      return;
+    }
+
+    this.state.loading = true;
+    this.state.loadingPhase = "sending";
+    this.state.error = undefined;
+    this.state.draft = "";
+    this.state.assistantPreviewText = "";
+    this.render();
+
+    try {
+      const nextSnapshot = await this.chatService.sendMessage(snapshot.session.id, content, {
+        onUserSnapshot: (updatedSnapshot) => {
+          this.state.snapshot = updatedSnapshot;
+          this.render();
+        },
+        onAssistantDelta: (text) => {
+          this.state.assistantPreviewText = text;
+          this.render();
+        },
+      });
+      this.state.snapshot = nextSnapshot;
+      this.state.assistantPreviewText = "";
+    } catch (error: any) {
+      Zotero.logError(error);
+      this.state.error = String(error?.message || error || "Failed to send message.");
+    } finally {
+      this.state.loading = false;
+      this.state.loadingPhase = undefined;
+      this.render();
+      this.focusComposer();
     }
   }
 
@@ -557,42 +648,60 @@ export class ContextChatPanel {
     this.historyDrawer.append(meta, list);
   }
 
+  private getRenderedMessages(messages: StoredMessage[]) {
+    if (!this.state.assistantPreviewText || !this.state.snapshot) {
+      return messages;
+    }
+    return messages.concat({
+      id: "assistant-preview",
+      sessionId: this.state.snapshot.session.id,
+      role: "assistant",
+      content: this.state.assistantPreviewText,
+      createdAt: Date.now(),
+    });
+  }
+
   private renderMessages(messages: StoredMessage[]) {
     this.messageList.replaceChildren();
     const doc = this.ownerWindow.document;
+    const renderedMessages = this.getRenderedMessages(messages);
 
-    if (messages.length == 0) {
+    if (renderedMessages.length == 0) {
       const empty = createHTML(doc, "div");
       empty.className = "sonder-empty-state";
 
       const title = createHTML(doc, "div");
       title.className = "sonder-empty-title";
-      title.textContent = this.state.error ? "Paper context unavailable" : "Paper session shell is ready";
+      title.textContent = this.state.error ? "Paper context unavailable" : "Paper chat is ready";
 
       const copy = createHTML(doc, "div");
       copy.className = "sonder-empty-copy";
       copy.textContent = this.state.error
         ? this.state.error
-        : "This is the new persisted paper-session shell. Reopening the same paper restores the latest session, and New Session creates another thread for the same paper.";
+        : "Ask your first question about the current paper. This conversation is persisted per paper, and reopening the same PDF restores the latest session automatically.";
 
       const copy2 = createHTML(doc, "div");
       copy2.className = "sonder-empty-copy";
       copy2.textContent = this.state.error
         ? "Once a PDF reader tab is active, click Chat again and Sonder will resolve the paper context explicitly."
-        : "The composer is intentionally mounted but not yet connected to provider transport in this milestone. The legacy command surface still remains available while the new panel is being rewritten.";
+        : "Current limitation: transport is wired, but paper retrieval/chunk citations are still coming in a later milestone.";
 
       empty.append(title, copy, copy2);
       this.messageList.appendChild(empty);
       return;
     }
 
-    messages.forEach((message) => {
+    renderedMessages.forEach((message) => {
       const node = createHTML(doc, "div");
       node.className = "sonder-message";
+      node.classList.add(message.role == "user" ? "is-user" : "is-assistant");
+      if (message.id == "assistant-preview") {
+        node.classList.add("is-streaming");
+      }
 
       const role = createHTML(doc, "div");
       role.className = "sonder-message-role";
-      role.textContent = message.role;
+      role.textContent = message.role == "user" ? "You" : "Sonder";
 
       const content = createHTML(doc, "div");
       content.className = "sonder-message-content";
@@ -601,6 +710,44 @@ export class ContextChatPanel {
       node.append(role, content);
       this.messageList.appendChild(node);
     });
+  }
+
+  private syncComposerState() {
+    const hasContext = Boolean(this.state.snapshot);
+    if (this.composerInput.value != this.state.draft) {
+      this.composerInput.value = this.state.draft;
+    }
+    this.composerInput.disabled = !hasContext || this.state.loading;
+    this.composerInput.placeholder = hasContext
+      ? "Ask about this paper"
+      : "Open a PDF reader tab and click Chat to start";
+    this.composerHint.textContent = hasContext
+      ? "Chatting with current paper"
+      : "Open a PDF reader tab and click Chat to resolve paper context";
+    this.composerNote.textContent = !hasContext
+      ? "Paper context is required before you can send a message."
+      : this.state.loadingPhase == "sending"
+        ? "Generating response with the current provider…"
+        : "Enter to send · Shift+Enter for newline";
+    this.sendButton.disabled = !hasContext || this.state.loading || !canSendDraft(this.state.draft);
+    this.sendButton.textContent = this.state.loadingPhase == "sending" ? "Sending…" : "Send";
+  }
+
+  private focusComposer() {
+    if (!this.state.visible || this.composerInput.disabled) {
+      return;
+    }
+    this.ownerWindow.setTimeout(() => {
+      try {
+        this.composerInput.focus();
+      } catch { }
+    }, 0);
+  }
+
+  private scrollMessagesToEnd() {
+    this.ownerWindow.setTimeout(() => {
+      this.messageList.scrollTop = this.messageList.scrollHeight;
+    }, 0);
   }
 
   private render() {
@@ -613,15 +760,17 @@ export class ContextChatPanel {
     this.title.textContent = hasContext ? snapshot!.context.title : "Open a PDF to start a paper session";
     this.sessionTitle.textContent = hasContext
       ? `${snapshot!.session.title} · Updated ${formatTimestamp(snapshot!.session.updatedAt)}`
-      : "Persisted session shell";
+      : "Persisted paper session";
 
     this.status.textContent = this.state.error
       ? "Failed"
-      : this.state.loading
-        ? "Preparing context…"
-        : hasContext
-          ? "Ready"
-          : "Awaiting paper";
+      : this.state.loadingPhase == "sending"
+        ? "Responding…"
+        : this.state.loading
+          ? "Preparing context…"
+          : hasContext
+            ? "Ready"
+            : "Awaiting paper";
     this.status.classList.toggle("is-pending", this.state.loading && !this.state.error);
     this.status.classList.toggle("is-error", Boolean(this.state.error));
 
@@ -629,15 +778,12 @@ export class ContextChatPanel {
     this.newSessionButton.disabled = !hasContext || this.state.loading;
     this.closeButton.disabled = false;
 
-    this.composerInput.disabled = !hasContext;
-    this.composerInput.value = "";
-    this.composerHint.textContent = hasContext
-      ? "Chatting with current paper"
-      : "Open a PDF reader tab and click Chat to resolve paper context";
-    this.sendButton.disabled = true;
-
     this.renderHistory();
     this.renderMessages(snapshot?.messages || []);
+    this.syncComposerState();
+    if (this.state.visible) {
+      this.scrollMessagesToEnd();
+    }
   }
 }
 

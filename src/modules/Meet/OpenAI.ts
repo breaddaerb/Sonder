@@ -268,28 +268,27 @@ class OpenAIEmbeddings {
   }
 }
 
-export async function getGPTResponse(requestText: string) {
-  const provider = getProvider()
-  if (provider == "openai-codex") {
-    return await getGPTResponseByCodex(requestText)
-  }
-  const secretKey = Zotero.Prefs.get(`${config.addonRef}.secretKey`)
-  if (!secretKey) { return await getGPTResponseBy(requestArgs[1], requestText) }
-  return await getGPTResponseByOpenAI(requestText)
-}
+export type TransportChatMessage = { role: "user" | "assistant"; content: string };
 
-export async function getGPTResponseByOpenAI(requestText: string) {
-  const views = Zotero[config.addonInstance].views as Views
+export type TransportChatOptions = {
+  onText?: (text: string) => void;
+};
+
+export type TransportChatResult = {
+  provider: ReturnType<typeof getProvider>;
+  model: string;
+  content: string;
+};
+
+async function requestOpenAIChat(
+  messages: TransportChatMessage[],
+  options: TransportChatOptions = {}
+): Promise<TransportChatResult> {
   const secretKey = Zotero.Prefs.get(`${config.addonRef}.secretKey`)
   const temperature = Zotero.Prefs.get(`${config.addonRef}.temperature`)
   let api = Zotero.Prefs.get(`${config.addonRef}.api`) as string
   api = api.replace(/\/(?:v1)?\/?$/, "")
   const model = getCurrentModel("openai-api")
-  views.messages.push({
-    role: "user",
-    content: requestText
-  })
-  const streaming = startStreamingOutput(views)
   const chatNumber = Zotero.Prefs.get(`${config.addonRef}.chatNumber`) as number
   const url = `${api}/v1/chat/completions`
   let responseText = ""
@@ -303,16 +302,16 @@ export async function getGPTResponseByOpenAI(requestText: string) {
           "Authorization": `Bearer ${secretKey}`,
         },
         body: JSON.stringify({
-          model: model,
-          messages: views.messages.slice(-chatNumber),
+          model,
+          messages: messages.slice(-chatNumber),
           stream: true,
-          temperature: Number(temperature)
+          temperature: Number(temperature),
         }),
         responseType: "text",
         requestObserver: (xmlhttp: XMLHttpRequest) => {
           xmlhttp.onprogress = (e: any) => {
             responseText = parseOpenAIText(e.target.response)
-            streaming.setPreviewText(responseText)
+            options.onText?.(responseText)
             if (e.target.timeout) {
               e.target.timeout = 0;
             }
@@ -333,24 +332,19 @@ export async function getGPTResponseByOpenAI(requestText: string) {
         .show()
     }
   }
-  streaming.finish(responseText)
-  views.messages.push({
-    role: "assistant",
-    content: responseText
-  })
-  return responseText
+  return {
+    provider: "openai-api",
+    model,
+    content: responseText,
+  }
 }
 
-export async function getGPTResponseByCodex(requestText: string) {
-  const views = Zotero[config.addonInstance].views as Views
+async function requestCodexChat(
+  messages: TransportChatMessage[],
+  options: TransportChatOptions = {}
+): Promise<TransportChatResult> {
   const model = getCurrentModel("openai-codex")
-  views.messages.push({
-    role: "user",
-    content: requestText,
-  })
   const chatNumber = Zotero.Prefs.get(`${config.addonRef}.chatNumber`) as number
-  const messages = views.messages.slice(-chatNumber)
-  const streaming = startStreamingOutput(views)
   let responseText = ""
   try {
     const credentials = await getValidCodexAccessToken()
@@ -371,7 +365,7 @@ export async function getGPTResponseByCodex(requestText: string) {
           store: false,
           stream: true,
           instructions: CODEX_INSTRUCTIONS,
-          input: buildCodexInput(messages),
+          input: buildCodexInput(messages.slice(-chatNumber)),
           text: { verbosity: "medium" },
         }),
         responseType: "text",
@@ -379,7 +373,7 @@ export async function getGPTResponseByCodex(requestText: string) {
           xmlhttp.onprogress = (e: any) => {
             const parsed = parseCodexStream(e.target.response)
             responseText = parsed.errorText || parsed.text
-            streaming.setPreviewText(responseText)
+            options.onText?.(responseText)
             if (e.target.timeout) {
               e.target.timeout = 0;
             }
@@ -393,12 +387,126 @@ export async function getGPTResponseByCodex(requestText: string) {
       .createLine({ text: error?.message || "Codex request failed.", type: "default" })
       .show()
   }
-  streaming.finish(responseText)
+  return {
+    provider: "openai-codex",
+    model,
+    content: responseText,
+  }
+}
+
+async function requestFallbackChat(
+  requestArg: RequestArg,
+  messages: TransportChatMessage[],
+  options: TransportChatOptions = {}
+): Promise<TransportChatResult> {
+  let responseText: string | undefined
+  let previewText = ""
+  const chatNumber = Zotero.Prefs.get(`${config.addonRef}.chatNumber`) as number
+  const slicedMessages = messages.slice(-chatNumber)
+  const requestText = slicedMessages[slicedMessages.length - 1]?.content || ""
+  const body = JSON.stringify(requestArg.body(requestText, slicedMessages))
+  try {
+    await Zotero.HTTP.request(
+      "POST",
+      requestArg.api,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          ...requestArg.headers,
+        },
+        body,
+        responseType: "text",
+        requestObserver: (xmlhttp: XMLHttpRequest) => {
+          xmlhttp.onprogress = (e: any) => {
+            previewText = e.target.response.replace(requestArg.remove, "")
+            if (requestArg.process) {
+              previewText = requestArg.process(previewText)
+            }
+            options.onText?.(previewText)
+            if (e.target.timeout) {
+              e.target.timeout = 0;
+            }
+          };
+        },
+      }
+    );
+    responseText = previewText
+  } catch (error: any) {
+    responseText = `# Request Error\n> ${requestArg.api}\n\n${error?.message || error}`
+    new ztoolkit.ProgressWindow("Request Error", { closeOtherProgressWindows: true })
+      .createLine({ text: error?.message || "Unknown request error.", type: "default" })
+      .show()
+  }
+  return {
+    provider: "openai-api",
+    model: getCurrentModel("openai-api") || "fallback",
+    content: responseText || "",
+  }
+}
+
+export async function requestProviderChat(
+  messages: TransportChatMessage[],
+  options: TransportChatOptions = {}
+): Promise<TransportChatResult> {
+  const provider = getProvider()
+  if (provider == "openai-codex") {
+    return await requestCodexChat(messages, options)
+  }
+  const secretKey = Zotero.Prefs.get(`${config.addonRef}.secretKey`)
+  if (!secretKey) {
+    return await requestFallbackChat(requestArgs[1], messages, options)
+  }
+  return await requestOpenAIChat(messages, options)
+}
+
+export async function getGPTResponse(requestText: string) {
+  const provider = getProvider()
+  if (provider == "openai-codex") {
+    return await getGPTResponseByCodex(requestText)
+  }
+  const secretKey = Zotero.Prefs.get(`${config.addonRef}.secretKey`)
+  if (!secretKey) { return await getGPTResponseBy(requestArgs[1], requestText) }
+  return await getGPTResponseByOpenAI(requestText)
+}
+
+export async function getGPTResponseByOpenAI(requestText: string) {
+  const views = Zotero[config.addonInstance].views as Views
+  views.messages.push({
+    role: "user",
+    content: requestText
+  })
+  const streaming = startStreamingOutput(views)
+  const result = await requestOpenAIChat(views.messages as TransportChatMessage[], {
+    onText(text) {
+      streaming.setPreviewText(text)
+    }
+  })
+  streaming.finish(result.content)
   views.messages.push({
     role: "assistant",
-    content: responseText,
+    content: result.content
   })
-  return responseText
+  return result.content
+}
+
+export async function getGPTResponseByCodex(requestText: string) {
+  const views = Zotero[config.addonInstance].views as Views
+  views.messages.push({
+    role: "user",
+    content: requestText,
+  })
+  const streaming = startStreamingOutput(views)
+  const result = await requestCodexChat(views.messages as TransportChatMessage[], {
+    onText(text) {
+      streaming.setPreviewText(text)
+    }
+  })
+  streaming.finish(result.content)
+  views.messages.push({
+    role: "assistant",
+    content: result.content,
+  })
+  return result.content
 }
 
 /**
@@ -413,51 +521,20 @@ export async function getGPTResponseBy(
   requestText: string,
 ) {
   const views = Zotero[config.addonInstance].views as Views
-  let responseText: string | undefined
-  let _responseText = ""
   views.messages.push({
     role: "user",
     content: requestText
   })
   const streaming = startStreamingOutput(views)
-  const chatNumber = Zotero.Prefs.get(`${config.addonRef}.chatNumber`) as number
-  const body = JSON.stringify(requestArg.body(requestText, views.messages.slice(-chatNumber)))
-  try {
-    await Zotero.HTTP.request(
-      "POST",
-      requestArg.api,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          ...requestArg.headers
-        },
-        body,
-        responseType: "text",
-        requestObserver: (xmlhttp: XMLHttpRequest) => {
-          xmlhttp.onprogress = (e: any) => {
-            _responseText = e.target.response.replace(requestArg.remove, "")
-            if (requestArg.process) {
-              _responseText = requestArg.process(_responseText)
-            }
-            streaming.setPreviewText(_responseText)
-            if (e.target.timeout) {
-              e.target.timeout = 0;
-            }
-          };
-        },
-      }
-    );
-    responseText = _responseText
-  } catch (error: any) {
-    responseText = `# Request Error\n> ${requestArg.api}\n\n${error?.message || error}`
-    new ztoolkit.ProgressWindow("Request Error", { closeOtherProgressWindows: true })
-      .createLine({ text: error?.message || "Unknown request error.", type: "default" })
-      .show()
-  }
-  streaming.finish(responseText || "")
+  const result = await requestFallbackChat(requestArg, views.messages as TransportChatMessage[], {
+    onText(text) {
+      streaming.setPreviewText(text)
+    }
+  })
+  streaming.finish(result.content)
   views.messages.push({
     role: "assistant",
-    content: responseText || ""
+    content: result.content
   })
-  return responseText || ""
+  return result.content
 }

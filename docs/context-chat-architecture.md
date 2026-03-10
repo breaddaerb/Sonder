@@ -1,6 +1,6 @@
 # Context Chat Architecture Note
 
-Status: M1 foundation
+Status: M1 foundation + basic paper chat transport
 
 This note records the first rewrite boundary for Sonder's new context-chat UX.
 
@@ -22,7 +22,7 @@ The new UX is isolated under:
 
 - `src/context-chat/`
 
-Current M1 modules:
+Current rewrite modules:
 
 - `src/context-chat/types.ts`
   - core persisted entities and helper functions
@@ -30,6 +30,10 @@ Current M1 modules:
   - JSON-backed context/session/message store
 - `src/context-chat/paperContext.ts`
   - current PDF paper-context resolver
+- `src/context-chat/chatMessages.ts`
+  - pure helpers for draft validation and provider-facing message history
+- `src/context-chat/chatService.ts`
+  - panel-facing send/receive orchestration and message persistence
 - `src/context-chat/panel.ts`
   - global right-side panel shell and header/history/composer UI
 - `src/context-chat/service.ts`
@@ -46,16 +50,23 @@ The inherited legacy surface remains in place for now:
 
 This is intentional so the new panel can be built incrementally without risking plugin loadability.
 
-## M1 scope
+## Current implemented scope
 
-Milestone M1 introduces:
+Implemented so far:
 
 - a visible `Chat` launcher button
 - a large right-side global panel shell
 - explicit `paper` context resolution from the active reader tab
 - persisted session creation/loading for paper context
-- a minimal history/new-session header flow
-- composer/message-list shell without transport hookup yet
+- history/new-session flow per paper context
+- composer send button + `Enter` / `Shift+Enter` behavior
+- basic multi-turn send/receive using the existing provider transport stack
+
+Still later:
+
+- explicit paper retrieval/chunk preparation in the new panel
+- citations/source-jump UI in the new panel
+- item + paper mode
 
 ## Context switching rule for now
 

@@ -77,11 +77,11 @@ Useful commands in the current baseline include:
 /report
 ```
 
-## Experimental M1 panel shell
+## Experimental paper chat panel
 
-The first rewrite milestone now introduces an experimental panel shell alongside the preserved legacy popup UI.
+The rewrite now includes an experimental paper-chat panel alongside the preserved legacy popup UI.
 
-Current M1 behavior:
+Current behavior:
 
 - a visible `Chat` launcher button is mounted in the Zotero main window
 - clicking it with an active PDF reader tab opens a large right-side panel
@@ -89,11 +89,15 @@ Current M1 behavior:
 - the latest saved session for that paper is restored automatically
 - `New Session` creates another persisted session for the same paper
 - `History` lists saved sessions for the current paper context
+- the composer is wired to the current provider transport
+- `Send` and `Enter` submit a message
+- `Shift+Enter` inserts a newline
+- multi-turn user/assistant messages are persisted per session
 
 Current limitation:
 
-- the new panel's composer is mounted, but message transport is not wired yet in this milestone
-- the legacy shortcut/command UI remains available as the working fallback for actual chat transport while the rewrite continues
+- paper retrieval/chunk citations are not wired into the new panel yet, so this is basic panel chat rather than the final full-paper retrieval experience
+- the legacy shortcut/command UI remains available as a fallback while the rewrite continues
 
 ## Tests
 
