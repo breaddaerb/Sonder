@@ -1,6 +1,6 @@
 # Context Chat Architecture Note
 
-Status: M1 foundation + basic paper chat transport
+Status: M1 foundation + basic paper-grounded chat
 
 This note records the first rewrite boundary for Sonder's new context-chat UX.
 
@@ -33,7 +33,9 @@ Current rewrite modules:
 - `src/context-chat/chatMessages.ts`
   - pure helpers for draft validation and provider-facing message history
 - `src/context-chat/chatService.ts`
-  - panel-facing send/receive orchestration and message persistence
+  - panel-facing send/receive orchestration, paper preparation state, and message persistence
+- `src/context-chat/paperRetrieval.ts`
+  - active-reader PDF parsing, chunking, lexical retrieval, and grounded prompt construction
 - `src/context-chat/panel.ts`
   - global right-side panel shell and header/history/composer UI
 - `src/context-chat/service.ts`
@@ -61,11 +63,13 @@ Implemented so far:
 - history/new-session flow per paper context
 - composer send button + `Enter` / `Shift+Enter` behavior
 - basic multi-turn send/receive using the existing provider transport stack
+- background paper preparation from the active PDF reader
+- chunked paper retrieval and prompt grounding in the new panel transport path
 
 Still later:
 
-- explicit paper retrieval/chunk preparation in the new panel
 - citations/source-jump UI in the new panel
+- richer/final retrieval strategy beyond the initial lexical chunk ranking
 - item + paper mode
 
 ## Context switching rule for now

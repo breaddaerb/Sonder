@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { canSendDraft, toChatHistory } from "../src/context-chat/chatMessages";
+import { buildPaperGroundedUserMessage, selectRelevantPaperChunks } from "../src/context-chat/paperRetrieval";
 import {
   createPaperContextId,
   createSessionId,
@@ -39,5 +40,21 @@ assert.deepEqual(
     { role: "assistant", content: "answer" },
   ]
 );
+
+const relevantChunks = selectRelevantPaperChunks("transformer attention", [
+  { id: "c1", page: 1, label: "p.1", content: "This paper studies convolutional baselines for vision tasks." },
+  { id: "c2", page: 2, label: "p.2", content: "We explain transformer attention and multi-head attention in detail." },
+  { id: "c3", page: 3, label: "p.3", content: "Results and ablations are reported for sequence modeling." },
+]);
+assert.equal(relevantChunks.some((chunk) => chunk.id == "c2"), true);
+
+const groundedPrompt = buildPaperGroundedUserMessage({
+  title: "Attention Paper",
+  question: "What does the paper say about attention?",
+  chunks: relevantChunks,
+});
+assert.match(groundedPrompt, /Retrieved paper context:/);
+assert.match(groundedPrompt, /p\.2/);
+assert.match(groundedPrompt, /User question:/);
 
 console.log("context-chat model tests passed");

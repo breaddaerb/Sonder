@@ -1,6 +1,6 @@
 # Sonder TODO
 
-Status: paper panel chat in progress  
+Status: paper-grounded panel chat in progress  
 Last updated: 2026-03-10
 
 This file turns `docs/context-chat-spec-v0.1.md` into an implementation-oriented task list.
@@ -171,6 +171,8 @@ Main direction: large right-side docked chat panel.
 - [x] Large scrollable message list
 - [x] User / assistant message separation
 - [ ] Markdown rendering
+  - [ ] Improve code-block readability in panel output
+  - [ ] Keep rendered output easy to copy/paste into Notion
 - [x] Long-answer friendly layout
 - [ ] Citation/source chip UI
 - [ ] Clicking citation jumps to source
@@ -195,20 +197,20 @@ Main direction: large right-side docked chat panel.
 User promise: when opening chat from a PDF, they can ask about the whole paper.
 
 - [ ] Reuse/clean up existing PDF parsing pipeline
-- [ ] Parse current PDF into chunks/documents
-- [ ] Add clear preparation lifecycle
-  - [ ] preparing
-  - [ ] ready
+- [x] Parse current PDF into chunks/documents
+- [x] Add clear preparation lifecycle
+  - [x] preparing
+  - [x] ready
   - [ ] stale
-  - [ ] failed
-- [ ] Retrieve relevant chunks per question
+  - [x] failed
+- [x] Retrieve relevant chunks per question
 - [ ] Keep source metadata for citation jumping
-- [ ] Avoid exposing old `AskPDF`-style hidden behavior as the primary model
+- [x] Avoid exposing old `AskPDF`-style hidden behavior as the primary model
 
 ### 7.1 Retrieval strategy
-- [ ] Decide what is V1 retrieval for `openai-api`
-- [ ] Decide what is V1 retrieval for `openai-codex`
-- [ ] Ensure product semantics stay stable even if retrieval internals differ
+- [x] Decide what is V1 retrieval for `openai-api`
+- [x] Decide what is V1 retrieval for `openai-codex`
+- [x] Ensure product semantics stay stable even if retrieval internals differ
 
 ---
 
@@ -277,6 +279,8 @@ Current inherited baseline disables the old MathJax plugin path because it broke
 - [ ] Decide safe formula rendering strategy for Sonder
 - [ ] Confirm chosen strategy does not break plugin startup
 - [ ] Test long technical/math-heavy answers in the new panel
+- [ ] Improve equation readability so outputs do not fall back to ugly raw formula text where avoidable
+- [ ] Prefer a markdown-like rendering/copy format that stays easy to paste into Notion
 
 This is important because one major product requirement is explaining paper formulas/principles in long outputs.
 

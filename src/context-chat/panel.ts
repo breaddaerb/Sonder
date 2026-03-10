@@ -1,4 +1,4 @@
-import ContextChatService from "./chatService";
+import ContextChatService, { PaperContextStatus } from "./chatService";
 import { canSendDraft } from "./chatMessages";
 import { resolveCurrentPaperContext } from "./paperContext";
 import ContextChatStore from "./storage";
@@ -40,6 +40,8 @@ export class ContextChatPanel {
     visible: boolean;
     loading: boolean;
     loadingPhase?: "opening" | "sending";
+    paperStatus: PaperContextStatus;
+    paperError?: string;
     historyOpen: boolean;
     draft: string;
     assistantPreviewText: string;
@@ -48,6 +50,7 @@ export class ContextChatPanel {
   } = {
     visible: false,
     loading: false,
+    paperStatus: "idle",
     historyOpen: false,
     draft: "",
     assistantPreviewText: "",
@@ -482,6 +485,40 @@ export class ContextChatPanel {
     this.sendButton = sendButton;
   }
 
+  private setPaperStatus(status: PaperContextStatus, error?: string) {
+    this.state.paperStatus = status;
+    this.state.paperError = error;
+  }
+
+  private syncPaperStatus() {
+    const contextId = this.state.snapshot?.context.id;
+    if (!contextId) {
+      this.setPaperStatus("idle");
+      return;
+    }
+    const state = this.chatService.getPaperContextState(contextId);
+    this.setPaperStatus(state.status, state.error);
+  }
+
+  private startPaperPreparation() {
+    const context = this.state.snapshot?.context;
+    if (!context) {
+      this.setPaperStatus("idle");
+      return;
+    }
+    this.syncPaperStatus();
+    this.chatService.preparePaperContext(context, (state) => {
+      if (this.state.snapshot?.context.id != context.id) {
+        return;
+      }
+      this.setPaperStatus(state.status, state.error);
+      if (state.status == "failed" && state.error && !this.state.error) {
+        this.state.error = state.error;
+      }
+      this.render();
+    });
+  }
+
   private async openCurrentPaper() {
     this.state.visible = true;
     this.state.loading = true;
@@ -489,6 +526,7 @@ export class ContextChatPanel {
     this.state.error = undefined;
     this.state.historyOpen = false;
     this.state.assistantPreviewText = "";
+    this.setPaperStatus("idle");
     this.render();
 
     const paperContext = resolveCurrentPaperContext();
@@ -506,6 +544,7 @@ export class ContextChatPanel {
       this.state.loading = false;
       this.state.loadingPhase = undefined;
       this.state.error = undefined;
+      this.syncPaperStatus();
     } catch (error: any) {
       this.state.loading = false;
       this.state.loadingPhase = undefined;
@@ -514,6 +553,7 @@ export class ContextChatPanel {
       Zotero.logError(error);
     }
     this.render();
+    this.startPaperPreparation();
     this.focusComposer();
   }
 
@@ -529,6 +569,7 @@ export class ContextChatPanel {
       const snapshot = await this.store.createNewSession(contextId);
       if (snapshot) {
         this.state.snapshot = snapshot;
+        this.syncPaperStatus();
       }
       this.state.historyOpen = false;
       this.state.error = undefined;
@@ -540,6 +581,7 @@ export class ContextChatPanel {
       this.state.loading = false;
       this.state.loadingPhase = undefined;
       this.render();
+      this.startPaperPreparation();
       this.focusComposer();
     }
   }
@@ -552,6 +594,7 @@ export class ContextChatPanel {
       const snapshot = await this.store.getSessionSnapshot(sessionId);
       if (snapshot) {
         this.state.snapshot = snapshot;
+        this.syncPaperStatus();
       }
       this.state.historyOpen = false;
       this.state.error = undefined;
@@ -563,6 +606,7 @@ export class ContextChatPanel {
       this.state.loading = false;
       this.state.loadingPhase = undefined;
       this.render();
+      this.startPaperPreparation();
       this.focusComposer();
     }
   }
@@ -589,6 +633,10 @@ export class ContextChatPanel {
         },
         onAssistantDelta: (text) => {
           this.state.assistantPreviewText = text;
+          this.render();
+        },
+        onPaperStatusChange: (state) => {
+          this.setPaperStatus(state.status, state.error);
           this.render();
         },
       });
@@ -672,19 +720,21 @@ export class ContextChatPanel {
 
       const title = createHTML(doc, "div");
       title.className = "sonder-empty-title";
-      title.textContent = this.state.error ? "Paper context unavailable" : "Paper chat is ready";
+      title.textContent = this.state.error ? "Paper context unavailable" : this.state.paperStatus == "preparing" ? "Preparing paper context" : "Paper chat is ready";
 
       const copy = createHTML(doc, "div");
       copy.className = "sonder-empty-copy";
       copy.textContent = this.state.error
         ? this.state.error
-        : "Ask your first question about the current paper. This conversation is persisted per paper, and reopening the same PDF restores the latest session automatically.";
+        : this.state.paperStatus == "preparing"
+          ? "Sonder is reading the current PDF and preparing retrievable paper chunks in the background. You can wait for Ready or send immediately and the panel will wait for preparation."
+          : "Ask your first question about the current paper. This conversation is persisted per paper, and reopening the same PDF restores the latest session automatically.";
 
       const copy2 = createHTML(doc, "div");
       copy2.className = "sonder-empty-copy";
       copy2.textContent = this.state.error
         ? "Once a PDF reader tab is active, click Chat again and Sonder will resolve the paper context explicitly."
-        : "Current limitation: transport is wired, but paper retrieval/chunk citations are still coming in a later milestone.";
+        : "Current limitation: the panel now retrieves relevant paper chunks for grounding, but citations/source-jump UI is still coming in a later milestone.";
 
       empty.append(title, copy, copy2);
       this.messageList.appendChild(empty);
@@ -727,8 +777,14 @@ export class ContextChatPanel {
     this.composerNote.textContent = !hasContext
       ? "Paper context is required before you can send a message."
       : this.state.loadingPhase == "sending"
-        ? "Generating response with the current provider…"
-        : "Enter to send · Shift+Enter for newline";
+        ? this.state.paperStatus == "preparing"
+          ? "Preparing paper context, then generating a grounded response…"
+          : "Generating response with the current provider…"
+        : this.state.paperStatus == "preparing"
+          ? "Preparing retrievable paper context… You can still press Send."
+          : this.state.paperStatus == "failed"
+            ? `Paper preparation failed: ${this.state.paperError || "unknown error"}`
+            : "Enter to send · Shift+Enter for newline";
     this.sendButton.disabled = !hasContext || this.state.loading || !canSendDraft(this.state.draft);
     this.sendButton.textContent = this.state.loadingPhase == "sending" ? "Sending…" : "Send";
   }
@@ -762,17 +818,17 @@ export class ContextChatPanel {
       ? `${snapshot!.session.title} · Updated ${formatTimestamp(snapshot!.session.updatedAt)}`
       : "Persisted paper session";
 
-    this.status.textContent = this.state.error
+    this.status.textContent = this.state.error || this.state.paperStatus == "failed"
       ? "Failed"
       : this.state.loadingPhase == "sending"
         ? "Responding…"
-        : this.state.loading
+        : this.state.loading || this.state.paperStatus == "preparing"
           ? "Preparing context…"
           : hasContext
             ? "Ready"
             : "Awaiting paper";
-    this.status.classList.toggle("is-pending", this.state.loading && !this.state.error);
-    this.status.classList.toggle("is-error", Boolean(this.state.error));
+    this.status.classList.toggle("is-pending", (this.state.loading || this.state.paperStatus == "preparing") && !(this.state.error || this.state.paperError));
+    this.status.classList.toggle("is-error", Boolean(this.state.error || this.state.paperError));
 
     this.historyButton.disabled = !hasContext || this.state.loading;
     this.newSessionButton.disabled = !hasContext || this.state.loading;

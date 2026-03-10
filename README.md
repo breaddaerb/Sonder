@@ -93,10 +93,13 @@ Current behavior:
 - `Send` and `Enter` submit a message
 - `Shift+Enter` inserts a newline
 - multi-turn user/assistant messages are persisted per session
+- the panel prepares chunked paper context from the active PDF and retrieves relevant chunks per question
+- responses are now grounded with retrieved paper context in the panel transport path
 
 Current limitation:
 
-- paper retrieval/chunk citations are not wired into the new panel yet, so this is basic panel chat rather than the final full-paper retrieval experience
+- citation chips/source-jump UI are not wired into the new panel yet
+- retrieval is currently a simple chunked lexical-ranking implementation, not the final retrieval stack yet
 - the legacy shortcut/command UI remains available as a fallback while the rewrite continues
 
 ## Tests
