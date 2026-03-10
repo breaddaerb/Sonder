@@ -1,0 +1,5 @@
+**/builds
+node_modules
+zotero-cmd.json
+.env
+**/test

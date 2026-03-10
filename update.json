@@ -1,0 +1,26 @@
+{
+  "addons": {
+    "sonder@test.local": {
+      "updates": [
+        {
+          "version": "0.1.0",
+          "update_link": "https://github.com/zhilin/Sonder/releases/latest/download/sonder.xpi",
+          "applications": {
+            "gecko": {
+              "strict_min_version": "60.0"
+            }
+          }
+        },
+        {
+          "version": "0.1.0",
+          "update_link": "https://github.com/zhilin/Sonder/releases/latest/download/sonder.xpi",
+          "applications": {
+            "zotero": {
+              "strict_min_version": "6.999"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

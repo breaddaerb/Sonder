@@ -1,0 +1,88 @@
+<div align="center">
+  <img src="imgs/background.png" width="42%" />
+
+# Sonder
+
+**Context-aware academic chat for Zotero**
+
+</div>
+
+---
+
+## Status
+
+This repository is the migrated successor of the previous `zotero-gpt` working branch.
+
+Current baseline goals already carried over:
+
+- the plugin can be built as a Zotero add-on
+- the plugin can be discovered and shown by Zotero
+- the current OAuth/Codex login pipeline is preserved
+- the current Codex backend chat pipeline is preserved
+
+The next product phase is a larger rewrite toward the context-chat UX described in:
+
+- [`docs/context-chat-spec-v0.1.md`](docs/context-chat-spec-v0.1.md)
+
+## What this repo is for right now
+
+This repo is **not** yet the final context-chat implementation.
+It is the new, cleaner project home that preserves the currently working technical base:
+
+- working add-on packaging / bootstrap behavior
+- working Zotero loadability
+- working ChatGPT/Codex OAuth flow
+- working Codex request path and provider plumbing
+
+That working base will be used for the next implementation stage.
+
+## Key docs
+
+- [`docs/migration-plan.md`](docs/migration-plan.md)
+- [`docs/context-chat-spec-v0.1.md`](docs/context-chat-spec-v0.1.md)
+- [`docs/codex-oauth.md`](docs/codex-oauth.md)
+- [`docs/plugin-loading-fix.md`](docs/plugin-loading-fix.md)
+
+## Build
+
+```bash
+git clone <your-sonder-repo-url>
+cd Sonder
+npm install
+npm run build-dev
+```
+
+Build output:
+
+- unpacked add-on: `builds/addon/`
+- XPI: `builds/sonder.xpi`
+
+## Install in Zotero
+
+Open Zotero:
+
+- `Tools -> Add-ons`
+- gear icon -> `Install Add-on From File...`
+- select `builds/sonder.xpi`
+
+## Current provider commands
+
+The current migrated baseline still includes the legacy command-driven interface while the new UX is being designed.
+Useful commands in the current baseline include:
+
+```text
+/provider openai-codex
+/login
+/report
+```
+
+## Immediate migration acceptance criteria
+
+The migrated baseline is considered acceptable if it still satisfies these already-working capabilities:
+
+- Sonder appears in Zotero Add-ons
+- the plugin starts successfully in Zotero
+- Codex OAuth login can still be completed
+- Codex chat can still return a response
+
+Those are the minimum guarantees before the context-chat rewrite begins.

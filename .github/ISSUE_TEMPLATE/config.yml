@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/zhilin/Sonder/tree/main/docs
+    about: Read the migration plan, OAuth notes, and context-chat spec before filing an issue.
