@@ -166,6 +166,36 @@ export function buildPaperGroundedUserMessage(args: {
   ].join("\n");
 }
 
+export function buildItemPaperGroundedUserMessage(args: {
+  paperTitle: string;
+  itemKind: "annotation" | "note";
+  itemText: string;
+  question: string;
+  chunks: PaperChunk[];
+}) {
+  const contextText = args.chunks.length > 0
+    ? args.chunks.map((chunk, index) => `[${index + 1}] (${chunk.label}) ${chunk.content}`).join("\n\n")
+    : "(No paper chunks were retrieved.)";
+  const itemLabel = args.itemKind == "annotation" ? "Selected annotation" : "Selected note";
+  return [
+    `You are helping the user chat with a selected ${args.itemKind} from the paper titled: ${args.paperTitle}`,
+    `${itemLabel} (must be treated as primary anchor):`,
+    args.itemText,
+    "",
+    "Always address the selected item directly first, then use paper context as supplementary evidence.",
+    "The selected item content is mandatory context and must never be ignored.",
+    "When referring to retrieved paper context, cite chunk numbers like [1] or [2].",
+    "Format the answer in clean markdown that stays easy to read and easy to copy into tools like Notion.",
+    "Use headings/lists/tables when helpful. Use fenced code blocks for code.",
+    "For math, prefer standard markdown math delimiters: use $...$ for inline equations and $$...$$ for standalone block equations.",
+    "",
+    "Supplementary paper context:",
+    contextText,
+    "",
+    `User question: ${args.question}`,
+  ].join("\n");
+}
+
 export async function readCurrentReaderPaperChunks(expectedAttachmentKey: string, contextId: string, title: string) {
   const reader = await ztoolkit.Reader.getReader() as _ZoteroTypes.ReaderInstance;
   if (!reader?.itemID) {

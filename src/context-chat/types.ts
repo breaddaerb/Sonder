@@ -15,6 +15,9 @@ export interface StoredContext {
   title: string;
   paperKey?: string;
   itemKey?: string;
+  libraryID?: number;
+  itemText?: string;
+  itemKind?: "annotation" | "note";
   updatedAt: number;
 }
 
@@ -48,7 +51,21 @@ export interface PaperContextDescriptor {
   attachmentItemID: number;
   attachmentKey: string;
   parentItemID?: number;
+  libraryID?: number;
   title: string;
+}
+
+export interface ItemPaperContextDescriptor {
+  itemID: number;
+  itemKey: string;
+  itemKind: "annotation" | "note";
+  itemTitle: string;
+  itemText: string;
+  paperAttachmentID: number;
+  paperAttachmentKey: string;
+  paperParentID?: number;
+  paperTitle: string;
+  libraryID?: number;
 }
 
 export interface SessionSnapshot {
@@ -69,6 +86,10 @@ export function createEmptyStoreData(): ContextChatStoreData {
 
 export function createPaperContextId(paperKey: string) {
   return `paper:${paperKey}`;
+}
+
+export function createItemPaperContextId(itemKey: string, paperKey: string) {
+  return `itempaper:${itemKey}:${paperKey}`;
 }
 
 export function createSessionId(now: number = Date.now(), randomValue: number = Math.random()) {

@@ -92,7 +92,7 @@ Conversation history must always be saved.
   - [x] load recent session for context
   - [x] list sessions for context
   - [x] create new session
-  - [ ] clear/delete session (if included in V1)
+  - [x] clear/delete session (if included in V1)
 - [x] Add migration-safe error handling
 - [ ] Add simple dev inspection/logging helpers
 
@@ -106,11 +106,11 @@ Conversation history must always be saved.
 - [x] Implement "open latest session or create one" behavior for paper context
 
 ## 4.2 Item + paper context
-- [ ] Detect selected annotation item / note item in Zotero
-- [ ] Resolve parent paper from selected item
-- [ ] Define stable `item+paper` context identity
-- [ ] Implement "open latest session or create one" behavior for item+paper context
-- [ ] Ensure selected item content is always force-injected into context
+- [x] Detect selected annotation item / note item in Zotero
+- [x] Resolve parent paper from selected item
+- [x] Define stable `item+paper` context identity
+- [x] Implement "open latest session or create one" behavior for item+paper context
+- [x] Ensure selected item content is always force-injected into context
 
 ## 4.3 Context switching rules
 - [x] Define how global panel reacts when current selection changes
@@ -128,16 +128,16 @@ Panel opens by explicit button click.
 - [ ] Bind it to paper context opening
 
 ### 5.2 Item entry
-- [ ] Add visible `Chat` entry for selected item workflows
-- [ ] Bind it to item+paper context opening
+- [x] Add visible `Chat` entry for selected item workflows
+- [x] Bind it to item+paper context opening
 
 ### 5.3 Safe fallback entry
-- [ ] Add plugin menu entry / stable fallback opening path
-- [ ] Ensure opening the panel does not depend on shortcuts
+- [x] Add plugin menu entry / stable fallback opening path
+- [x] Ensure opening the panel does not depend on shortcuts
 
 ### 5.4 Shortcut policy
-- [ ] Decide whether to keep current shortcut only as secondary convenience
-- [ ] Ensure shortcut is not the primary UX dependency
+- [x] Decide whether to keep current shortcut only as secondary convenience
+- [x] Ensure shortcut is not the primary UX dependency
 
 ---
 
@@ -153,15 +153,15 @@ Main direction: large right-side docked chat panel.
 ### 6.2 Header
 - [x] Show context badge
   - [x] `Paper`
-  - [ ] `Annotation + Paper`
-  - [ ] `Note + Paper`
+  - [x] `Annotation + Paper`
+  - [x] `Note + Paper`
 - [x] Show context title
 - [x] Show current session title/label
 - [x] Add header actions
   - [x] `New Session`
   - [x] `History`
   - [x] `Raw Markdown` / `Preview`
-  - [ ] `Clear Current Session`
+  - [x] `Clear Current Session`
   - [ ] optional `Settings`
 - [x] Add status indicator
   - [x] preparing
@@ -185,12 +185,12 @@ Main direction: large right-side docked chat panel.
 - [x] Send button
 - [x] Context hint text
   - [x] `Chatting with current paper`
-  - [ ] `Chatting with selected annotation + paper`
+  - [x] `Chatting with selected annotation + paper`
 
 ### 6.5 Resizing and layout
 - [x] Set good default width (target: 40%–50%)
-- [ ] Add resizable width support
-- [ ] Ensure long answers are easy to scroll
+- [x] Add resizable width support
+- [x] Ensure long answers are easy to scroll
 
 ---
 
@@ -220,13 +220,13 @@ User promise: when opening chat from a PDF, they can ask about the whole paper.
 
 User promise: the selected item is the anchor, and the paper provides background.
 
-- [ ] Always inject selected item text into context
-- [ ] Retrieve supporting chunks from parent paper
-- [ ] Preserve item identity in citations/source UI if relevant
-- [ ] Ensure answers feel about *this item* rather than generic paper summary
+- [x] Always inject selected item text into context
+- [x] Retrieve supporting chunks from parent paper
+- [x] Preserve item identity in citations/source UI if relevant
+- [x] Ensure answers feel about *this item* rather than generic paper summary
 
 ### Required rule
-- [ ] Item content must never be optional in `item+paper` mode
+- [x] Item content must never be optional in `item+paper` mode
 
 ---
 
@@ -271,7 +271,7 @@ A core value of paper chat is being able to jump back to source.
   - [x] jump to PDF region for paper chunks
   - [ ] jump to a finer-grained paragraph/box region instead of page-level only
   - [ ] visually highlight/mark the relevant cited content after jump
-  - [ ] select Zotero item for item sources where appropriate
+  - [x] select Zotero item for item sources where appropriate
 - [x] Make citations visible but not visually noisy
 
 ---
@@ -310,7 +310,7 @@ These are not blockers for the migration baseline, but they should be cleaned up
 
 - [ ] Investigate inherited non-fatal toolkit warning:
   - [ ] `TypeError: this.getGlobal(...).get(...) is not a constructor`
-- [ ] Remove temporary development auto-open hack once new panel entry exists
+- [x] Remove temporary development auto-open hack once new panel entry exists
 - [ ] Remove/bootstrap debug marker code when no longer needed
 - [ ] Clean up leftover predecessor naming in docs/comments where appropriate
 - [ ] Decide whether old inherited assets/tags should stay in repo or move to legacy folder
@@ -337,10 +337,10 @@ Recommended sequence for happy coding:
 - [x] send/receive basic messages in paper context
 
 ### Phase 4: item + paper context
-- [ ] selected item detection
-- [ ] force-injected item content
-- [ ] paper retrieval supplement
-- [ ] open/create session
+- [x] selected item detection
+- [x] force-injected item content
+- [x] paper retrieval supplement
+- [x] open/create session
 
 ### Phase 5: history/session UX
 - [x] latest session restore

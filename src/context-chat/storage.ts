@@ -3,12 +3,14 @@ import { getCurrentModel, getProvider } from "../modules/provider";
 import {
   Citation,
   ContextChatStoreData,
+  ItemPaperContextDescriptor,
   PaperContextDescriptor,
   SessionSnapshot,
   StoredContext,
   StoredMessage,
   StoredSession,
   createEmptyStoreData,
+  createItemPaperContextId,
   createMessageId,
   createPaperContextId,
   createSessionId,
@@ -136,6 +138,36 @@ export class ContextChatStore {
       type: "paper",
       title: descriptor.title,
       paperKey: descriptor.attachmentKey,
+      libraryID: descriptor.libraryID,
+      updatedAt: now,
+    };
+    this.cache.contexts[contextId] = {
+      ...(this.cache.contexts[contextId] || context),
+      ...context,
+    };
+
+    const sessions = this.getSessionsForContext(contextId);
+    const latestSession = getLatestSession(sessions);
+    const session = latestSession || this.createSession(this.cache.contexts[contextId], sessions, now);
+    this.touchSession(this.cache.contexts[contextId], session, now);
+    this.cache.sessions[session.id] = session;
+    await this.persist();
+    return this.buildSnapshot(this.cache.contexts[contextId], session);
+  }
+
+  public async getOrCreateItemPaperSession(descriptor: ItemPaperContextDescriptor): Promise<SessionSnapshot> {
+    await this.ready();
+    const now = Date.now();
+    const contextId = createItemPaperContextId(descriptor.itemKey, descriptor.paperAttachmentKey);
+    const context: StoredContext = {
+      id: contextId,
+      type: "item+paper",
+      title: descriptor.paperTitle,
+      paperKey: descriptor.paperAttachmentKey,
+      itemKey: descriptor.itemKey,
+      itemText: descriptor.itemText,
+      itemKind: descriptor.itemKind,
+      libraryID: descriptor.libraryID,
       updatedAt: now,
     };
     this.cache.contexts[contextId] = {
@@ -206,6 +238,23 @@ export class ContextChatStore {
     this.cache.messages[sessionId] ||= [];
     this.cache.messages[sessionId].push(message);
     this.touchSession(context, session, now, options);
+    await this.persist();
+    return this.buildSnapshot(context, session);
+  }
+
+  public async clearSessionMessages(sessionId: string): Promise<SessionSnapshot | undefined> {
+    await this.ready();
+    const session = this.cache.sessions[sessionId];
+    if (!session) {
+      return undefined;
+    }
+    const context = this.cache.contexts[session.contextId];
+    if (!context) {
+      return undefined;
+    }
+    this.cache.messages[sessionId] = [];
+    const now = Date.now();
+    this.touchSession(context, session, now);
     await this.persist();
     return this.buildSnapshot(context, session);
   }

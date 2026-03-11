@@ -29,15 +29,6 @@ async function onStartup() {
 
   Zotero.debug(`${config.addonRef}: startup ready`)
 
-  if (addon.data.env === "development") {
-    Zotero.Promise.delay(1200).then(() => {
-      try {
-        Zotero[config.addonInstance].views.show()
-      } catch (error: any) {
-        Zotero.logError(error)
-      }
-    })
-  }
 }
 
 async function onMainWindowLoad(window: Window) {

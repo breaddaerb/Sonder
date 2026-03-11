@@ -85,10 +85,16 @@ Current behavior:
 
 - a visible `Chat` launcher button is mounted in the Zotero main window
 - clicking it with an active PDF reader tab opens a large right-side panel
+- a fallback `Sonder Chat Panel` Tools/Add-ons menu entry is installed for stable opening without shortcuts
 - the panel resolves explicit `Paper` context from the current PDF
-- the latest saved session for that paper is restored automatically
-- `New Session` creates another persisted session for the same paper
-- `History` lists saved sessions for the current paper context
+- selecting an annotation/note item in the library and clicking `Chat` opens `Item + Paper` context
+- in `Item + Paper` mode, selected item content is force-injected as primary anchor context
+- the latest saved session is restored automatically per context (`paper` or `item+paper`)
+- `New Session` creates another persisted session for the same context
+- `History` lists saved sessions for the current context
+- `Clear Session` clears messages in the active session with confirmation
+- panel header includes Codex auth actions (`Enable/Login/Finish/Logout Codex`) so OAuth does not depend on slash commands
+- drag the panel’s left edge to resize width (width is remembered)
 - the composer is wired to the current provider transport
 - `Send` and `Enter` submit a message
 - `Shift+Enter` inserts a newline
@@ -96,7 +102,8 @@ Current behavior:
 - the panel prepares chunked paper context from the active PDF and retrieves relevant chunks per question
 - responses are now grounded with retrieved paper context in the panel transport path
 - assistant messages show lightweight citation chips for retrieved paper chunks
-- clicking a citation chip jumps back to the relevant PDF page
+- in `Item + Paper` mode, assistant citations include a `Selected annotation/note` chip to preserve item identity
+- clicking a citation chip jumps back to the relevant PDF page, or selects the cited item for item-source chips
 - assistant output is shown as raw markdown by default
 - streaming stays in raw markdown form for stability
 - a header toggle switches between `Raw Markdown` and rendered `Preview`
@@ -109,6 +116,7 @@ Current limitation:
 - citation jumping currently targets the relevant PDF page, not a fine-grained paragraph/box location yet
 - math preview quality depends on the model emitting explicit math delimiters consistently, though the panel now nudges it toward `$...$` / `$$...$$`
 - retrieval is currently a simple chunked lexical-ranking implementation, not the final retrieval stack yet
+- item+paper mode always injects selected item text; paper retrieval still depends on available PDF preparation context
 - the legacy shortcut/command UI remains available as a fallback while the rewrite continues
 
 ## Tests

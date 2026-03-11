@@ -1,6 +1,9 @@
 import ContextChatService, { PaperContextStatus } from "./chatService";
 import { canSendDraft } from "./chatMessages";
+import { resolveSelectedItemPaperContextWithSource } from "./itemPaperContext";
 import { resolveCurrentPaperContext } from "./paperContext";
+import { clearCodexLogin, finishCodexOAuthLogin, getCodexLoginReport, startCodexOAuthLogin } from "../modules/Meet/CodexOAuth";
+import { getCurrentModel, getProvider, hasCodexCredentials, setProvider } from "../modules/provider";
 import { renderMessageHTML } from "./render";
 import ContextChatStore from "./storage";
 import { SessionSnapshot, StoredMessage } from "./types";
@@ -20,15 +23,20 @@ function formatTimestamp(timestamp: number) {
   }).format(new Date(timestamp));
 }
 
+const PANEL_WIDTH_STORAGE_KEY = "sonder.contextChat.panelWidth";
+
 export class ContextChatPanel {
   private launcherButton!: HTMLButtonElement;
   private panel!: HTMLDivElement;
+  private resizeHandle!: HTMLDivElement;
   private badge!: HTMLSpanElement;
   private title!: HTMLDivElement;
   private sessionTitle!: HTMLDivElement;
   private status!: HTMLSpanElement;
   private historyButton!: HTMLButtonElement;
   private newSessionButton!: HTMLButtonElement;
+  private clearSessionButton!: HTMLButtonElement;
+  private codexAuthButton!: HTMLButtonElement;
   private viewModeButton!: HTMLButtonElement;
   private closeButton!: HTMLButtonElement;
   private historyDrawer!: HTMLDivElement;
@@ -50,6 +58,7 @@ export class ContextChatPanel {
     assistantPreviewText: string;
     snapshot?: SessionSnapshot;
     error?: string;
+    panelWidth?: number;
   } = {
     visible: false,
     loading: false,
@@ -64,7 +73,9 @@ export class ContextChatPanel {
     private readonly ownerWindow: Window,
     private readonly store: ContextChatStore,
     private readonly chatService: ContextChatService,
-  ) {}
+  ) {
+    this.state.panelWidth = this.loadSavedPanelWidth();
+  }
 
   public install() {
     const doc = this.ownerWindow.document;
@@ -77,6 +88,10 @@ export class ContextChatPanel {
     this.buildLauncher();
     this.buildPanel();
     this.render();
+  }
+
+  public open() {
+    void this.openCurrentContext();
   }
 
   public destroy() {
@@ -113,8 +128,9 @@ export class ContextChatPanel {
         top: 0;
         right: 0;
         z-index: 2147482999;
-        width: min(46vw, 760px);
+        width: var(--sonder-panel-width, min(46vw, 760px));
         min-width: 420px;
+        max-width: 85vw;
         height: 100vh;
         display: none;
         flex-direction: column;
@@ -123,6 +139,28 @@ export class ContextChatPanel {
         box-shadow: -18px 0 48px rgba(15, 23, 42, 0.18);
         border-left: 1px solid rgba(148, 163, 184, 0.2);
         font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      #sonder-context-chat-panel .sonder-resize-handle {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 8px;
+        height: 100%;
+        cursor: col-resize;
+        z-index: 2;
+      }
+      #sonder-context-chat-panel .sonder-resize-handle::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 2px;
+        height: 100%;
+        background: transparent;
+        transition: background 120ms ease;
+      }
+      #sonder-context-chat-panel .sonder-resize-handle:hover::after {
+        background: rgba(59, 130, 246, 0.35);
       }
       #sonder-context-chat-panel .sonder-panel-header {
         padding: 18px 20px 16px;
@@ -507,7 +545,7 @@ export class ContextChatPanel {
     button.id = "sonder-context-chat-launcher";
     button.textContent = "Chat";
     button.addEventListener("click", () => {
-      void this.openCurrentPaper();
+      void this.openCurrentContext();
     });
     this.launcherButton = button;
     doc.documentElement.appendChild(button);
@@ -517,6 +555,13 @@ export class ContextChatPanel {
     const doc = this.ownerWindow.document;
     const panel = createHTML(doc, "div");
     panel.id = "sonder-context-chat-panel";
+
+    const resizeHandle = createHTML(doc, "div");
+    resizeHandle.className = "sonder-resize-handle";
+    resizeHandle.title = "Drag to resize";
+    resizeHandle.addEventListener("mousedown", (event) => {
+      this.startResize(event);
+    });
 
     const header = createHTML(doc, "div");
     header.className = "sonder-panel-header";
@@ -556,6 +601,19 @@ export class ContextChatPanel {
       void this.createNewSession();
     });
 
+    const clearSessionButton = createHTML(doc, "button");
+    clearSessionButton.className = "sonder-action";
+    clearSessionButton.textContent = "Clear Session";
+    clearSessionButton.addEventListener("click", () => {
+      void this.clearCurrentSession();
+    });
+
+    const codexAuthButton = createHTML(doc, "button");
+    codexAuthButton.className = "sonder-action";
+    codexAuthButton.addEventListener("click", () => {
+      void this.handleCodexAuth();
+    });
+
     const viewModeButton = createHTML(doc, "button");
     viewModeButton.className = "sonder-action";
     viewModeButton.addEventListener("click", () => {
@@ -572,7 +630,7 @@ export class ContextChatPanel {
       this.render();
     });
 
-    actionRow.append(historyButton, newSessionButton, viewModeButton, closeButton);
+    actionRow.append(historyButton, newSessionButton, clearSessionButton, codexAuthButton, viewModeButton, closeButton);
 
     const historyDrawer = createHTML(doc, "div");
     historyDrawer.className = "sonder-history-drawer";
@@ -618,16 +676,20 @@ export class ContextChatPanel {
     composerActions.append(composerNote, sendButton);
     composer.append(composerHint, composerInput, composerActions);
 
-    panel.append(header, messageList, composer);
+    panel.append(resizeHandle, header, messageList, composer);
     doc.documentElement.appendChild(panel);
 
     this.panel = panel;
+    this.resizeHandle = resizeHandle;
+    this.applyPanelWidth();
     this.badge = badge;
     this.title = title;
     this.sessionTitle = sessionTitle;
     this.status = status;
     this.historyButton = historyButton;
     this.newSessionButton = newSessionButton;
+    this.clearSessionButton = clearSessionButton;
+    this.codexAuthButton = codexAuthButton;
     this.viewModeButton = viewModeButton;
     this.closeButton = closeButton;
     this.historyDrawer = historyDrawer;
@@ -636,6 +698,57 @@ export class ContextChatPanel {
     this.composerInput = composerInput;
     this.composerNote = composerNote;
     this.sendButton = sendButton;
+  }
+
+  private loadSavedPanelWidth() {
+    try {
+      const raw = this.ownerWindow.localStorage?.getItem(PANEL_WIDTH_STORAGE_KEY);
+      const width = Number(raw || NaN);
+      return Number.isFinite(width) ? width : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private savePanelWidth(width: number) {
+    try {
+      this.ownerWindow.localStorage?.setItem(PANEL_WIDTH_STORAGE_KEY, String(width));
+    } catch {
+      // ignore persistence failures
+    }
+  }
+
+  private applyPanelWidth() {
+    if (!this.panel || !this.state.panelWidth) {
+      return;
+    }
+    this.panel.style.setProperty("--sonder-panel-width", `${Math.round(this.state.panelWidth)}px`);
+  }
+
+  private startResize(event: MouseEvent) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = this.panel.getBoundingClientRect().width;
+    const minWidth = 420;
+    const maxWidth = Math.floor(this.ownerWindow.innerWidth * 0.85);
+
+    const onMove = (moveEvent: MouseEvent) => {
+      const delta = startX - moveEvent.clientX;
+      const nextWidth = Math.min(maxWidth, Math.max(minWidth, startWidth + delta));
+      this.state.panelWidth = nextWidth;
+      this.applyPanelWidth();
+    };
+
+    const onUp = () => {
+      this.ownerWindow.removeEventListener("mousemove", onMove);
+      this.ownerWindow.removeEventListener("mouseup", onUp);
+      if (this.state.panelWidth) {
+        this.savePanelWidth(this.state.panelWidth);
+      }
+    };
+
+    this.ownerWindow.addEventListener("mousemove", onMove);
+    this.ownerWindow.addEventListener("mouseup", onUp);
   }
 
   private setPaperStatus(status: PaperContextStatus, error?: string) {
@@ -672,7 +785,7 @@ export class ContextChatPanel {
     });
   }
 
-  private async openCurrentPaper() {
+  private async openCurrentContext() {
     this.state.visible = true;
     this.state.loading = true;
     this.state.loadingPhase = "opening";
@@ -682,18 +795,22 @@ export class ContextChatPanel {
     this.setPaperStatus("idle");
     this.render();
 
-    const paperContext = resolveCurrentPaperContext();
-    if (!paperContext) {
+    const itemResolution = await resolveSelectedItemPaperContextWithSource();
+    const itemPaperContext = itemResolution.context;
+    const paperContext = !itemPaperContext ? resolveCurrentPaperContext() : undefined;
+    if (!itemPaperContext && !paperContext) {
       this.state.loading = false;
       this.state.loadingPhase = undefined;
       this.state.snapshot = undefined;
-      this.state.error = "Open a PDF reader tab, then click Chat to start a paper session.";
+      this.state.error = "Open a PDF or select an annotation/note item, then click Chat.";
       this.render();
       return;
     }
 
     try {
-      this.state.snapshot = await this.store.getOrCreatePaperSession(paperContext);
+      this.state.snapshot = itemPaperContext
+        ? await this.store.getOrCreateItemPaperSession(itemPaperContext)
+        : await this.store.getOrCreatePaperSession(paperContext!);
       this.state.loading = false;
       this.state.loadingPhase = undefined;
       this.state.error = undefined;
@@ -702,7 +819,7 @@ export class ContextChatPanel {
       this.state.loading = false;
       this.state.loadingPhase = undefined;
       this.state.snapshot = undefined;
-      this.state.error = String(error?.message || error || "Failed to open paper session.");
+      this.state.error = String(error?.message || error || "Failed to open context session.");
       Zotero.logError(error);
     }
     this.render();
@@ -736,6 +853,88 @@ export class ContextChatPanel {
       this.render();
       this.startPaperPreparation();
       this.focusComposer();
+    }
+  }
+
+  private async clearCurrentSession() {
+    const sessionId = this.state.snapshot?.session.id;
+    if (!sessionId) {
+      return;
+    }
+    if (!this.ownerWindow.confirm("Clear all messages in the current session? This cannot be undone.")) {
+      return;
+    }
+    this.state.loading = true;
+    this.state.loadingPhase = "opening";
+    this.render();
+    try {
+      const snapshot = await this.store.clearSessionMessages(sessionId);
+      if (snapshot) {
+        this.state.snapshot = snapshot;
+        this.syncPaperStatus();
+      }
+      this.state.historyOpen = false;
+      this.state.error = undefined;
+      this.state.assistantPreviewText = "";
+    } catch (error: any) {
+      Zotero.logError(error);
+      this.state.error = "Failed to clear current session.";
+    } finally {
+      this.state.loading = false;
+      this.state.loadingPhase = undefined;
+      this.render();
+      this.startPaperPreparation();
+      this.focusComposer();
+    }
+  }
+
+  private async handleCodexAuth() {
+    try {
+      let provider = getProvider();
+      if (provider != "openai-codex") {
+        const shouldSwitch = this.ownerWindow.confirm("Switch provider to openai-codex and start Codex OAuth login?");
+        if (!shouldSwitch) {
+          return;
+        }
+        setProvider("openai-codex");
+        provider = "openai-codex";
+      }
+
+      const report = getCodexLoginReport();
+      if (report.hasPendingLogin) {
+        const pasted = this.ownerWindow.prompt("Paste the redirect URL (or authorization code) to finish Codex login:", "");
+        if (!pasted) {
+          return;
+        }
+        const credentials = await finishCodexOAuthLogin(pasted);
+        this.ownerWindow.alert(`Codex login succeeded. accountId: ${credentials.accountId.slice(0, 6)}... model: ${getCurrentModel("openai-codex")}`);
+        this.render();
+        return;
+      }
+
+      if (hasCodexCredentials()) {
+        const shouldLogout = this.ownerWindow.confirm("Codex is already logged in. Logout now?");
+        if (!shouldLogout) {
+          return;
+        }
+        clearCodexLogin();
+        this.ownerWindow.alert("Cleared Codex OAuth credentials.");
+        this.render();
+        return;
+      }
+
+      const auth = await startCodexOAuthLogin();
+      Zotero.launchURL(auth.url);
+      this.ownerWindow.alert([
+        "Opened ChatGPT login page in your browser.",
+        "",
+        "After browser redirect fails on localhost (expected), copy the full URL.",
+        "Then click 'Finish Login' in panel header and paste it.",
+      ].join("\n"));
+      this.render();
+    } catch (error: any) {
+      this.ownerWindow.alert(String(error?.message || error || "Codex auth failed."));
+      this.render();
     }
   }
 
@@ -849,9 +1048,25 @@ export class ContextChatPanel {
     this.historyDrawer.append(meta, list);
   }
 
-  private async jumpToCitation(target?: string, page?: number) {
+  private async jumpToCitation(citation: { sourceType: "paper" | "item"; target?: string; page?: number }) {
     try {
-      const resolvedPage = page || (target?.startsWith("page:") ? Number(target.slice(5)) : 0);
+      if (citation.sourceType == "item" && citation.target?.startsWith("item:")) {
+        const [, libraryStr, itemKey] = citation.target.split(":");
+        const libraryID = Number(libraryStr || NaN);
+        if (!itemKey || Number.isNaN(libraryID)) {
+          return;
+        }
+        const item = Zotero.Items.getByLibraryAndKey(libraryID, itemKey) as Zotero.Item | false;
+        if (!item) {
+          return;
+        }
+
+        ZoteroPane.selectItem(item.id);
+        return;
+      }
+
+      const target = citation.target;
+      const resolvedPage = citation.page || (target?.startsWith("page:") ? Number(target.slice(5)) : 0);
       if (!resolvedPage) {
         return;
       }
@@ -941,20 +1156,28 @@ export class ContextChatPanel {
 
       const title = createHTML(doc, "div");
       title.className = "sonder-empty-title";
-      title.textContent = this.state.error ? "Paper context unavailable" : this.state.paperStatus == "preparing" ? "Preparing paper context" : "Paper chat is ready";
+      title.textContent = this.state.error
+        ? "Context unavailable"
+        : this.state.paperStatus == "preparing"
+          ? "Preparing paper context"
+          : this.state.snapshot?.context.type == "item+paper"
+            ? "Item + Paper chat is ready"
+            : "Paper chat is ready";
 
       const copy = createHTML(doc, "div");
       copy.className = "sonder-empty-copy";
       copy.textContent = this.state.error
         ? this.state.error
         : this.state.paperStatus == "preparing"
-          ? "Sonder is reading the current PDF and preparing retrievable paper chunks in the background. You can wait for Ready or send immediately and the panel will wait for preparation."
-          : "Ask your first question about the current paper. This conversation is persisted per paper, and reopening the same PDF restores the latest session automatically.";
+          ? "Sonder is reading the parent paper and preparing retrievable chunks in the background. You can wait for Ready or send immediately and the panel will wait for preparation."
+          : this.state.snapshot?.context.type == "item+paper"
+            ? "Ask about the selected annotation/note. Sonder will always force-inject the selected item content and use paper chunks as supplementary context."
+            : "Ask your first question about the current paper. This conversation is persisted per paper, and reopening the same PDF restores the latest session automatically.";
 
       const copy2 = createHTML(doc, "div");
       copy2.className = "sonder-empty-copy";
       copy2.textContent = this.state.error
-        ? "Once a PDF reader tab is active, click Chat again and Sonder will resolve the paper context explicitly."
+        ? "Activate a PDF reader tab or select an annotation/note item, then click Chat again to resolve context."
         : "Assistant output is shown as raw markdown by default. Use the Preview button in the header to switch rendered preview on and off.";
 
       empty.append(title, copy, copy2);
@@ -995,7 +1218,7 @@ export class ContextChatPanel {
             chip.title = citation.preview;
           }
           chip.addEventListener("click", () => {
-            void this.jumpToCitation(citation.target, citation.page);
+            void this.jumpToCitation(citation);
           });
           citations.appendChild(chip);
         });
@@ -1013,11 +1236,11 @@ export class ContextChatPanel {
     }
     this.composerInput.disabled = !hasContext || this.state.loading;
     this.composerInput.placeholder = hasContext
-      ? "Ask about this paper"
-      : "Open a PDF reader tab and click Chat to start";
-    this.composerHint.textContent = hasContext
-      ? "Chatting with current paper"
-      : "Open a PDF reader tab and click Chat to resolve paper context";
+      ? this.state.snapshot?.context.type == "item+paper"
+        ? "Ask about the selected annotation/note"
+        : "Ask about this paper"
+      : "Open a PDF reader tab or select an annotation/note, then click Chat";
+    this.composerHint.textContent = this.getComposerHint();
     this.composerNote.textContent = !hasContext
       ? "Paper context is required before you can send a message."
       : this.state.loadingPhase == "sending"
@@ -1050,17 +1273,55 @@ export class ContextChatPanel {
     }, 0);
   }
 
+  private getContextBadgeLabel() {
+    const context = this.state.snapshot?.context;
+    if (!context) {
+      return "Context chat";
+    }
+    if (context.type == "item+paper") {
+      return context.itemKind == "note" ? "Note + Paper" : "Annotation + Paper";
+    }
+    return "Paper";
+  }
+
+  private getContextTitle() {
+    const context = this.state.snapshot?.context;
+    if (!context) {
+      return "Open a PDF or select an annotation/note to start";
+    }
+    if (context.type == "item+paper") {
+      const itemTitle = (context.itemText || "").slice(0, 72);
+      return itemTitle.length > 0 ? `${itemTitle}${context.itemText && context.itemText.length > 72 ? "…" : ""}` : "Selected item + paper";
+    }
+    return context.title;
+  }
+
+  private getComposerHint() {
+    const context = this.state.snapshot?.context;
+    if (!context) {
+      return "Open a PDF reader tab or select an annotation/note, then click Chat";
+    }
+    if (context.type == "item+paper") {
+      return context.itemKind == "note"
+        ? "Chatting with selected note + parent paper"
+        : "Chatting with selected annotation + parent paper";
+    }
+    return "Chatting with current paper";
+  }
+
   private render() {
     const snapshot = this.state.snapshot;
     const hasContext = Boolean(snapshot);
     this.panel.style.display = this.state.visible ? "flex" : "none";
     this.launcherButton.style.display = this.state.visible ? "none" : "";
 
-    this.badge.textContent = hasContext ? "Paper" : "Paper chat";
-    this.title.textContent = hasContext ? snapshot!.context.title : "Open a PDF to start a paper session";
+    this.badge.textContent = this.getContextBadgeLabel();
+    this.title.textContent = this.getContextTitle();
     this.sessionTitle.textContent = hasContext
-      ? `${snapshot!.session.title} · Updated ${formatTimestamp(snapshot!.session.updatedAt)}`
-      : "Persisted paper session";
+      ? snapshot!.context.type == "item+paper"
+        ? `${snapshot!.session.title} · ${snapshot!.context.title} · Updated ${formatTimestamp(snapshot!.session.updatedAt)}`
+        : `${snapshot!.session.title} · Updated ${formatTimestamp(snapshot!.session.updatedAt)}`
+      : "Persisted context session";
 
     this.status.textContent = this.state.error || this.state.paperStatus == "failed"
       ? "Failed"
@@ -1076,6 +1337,25 @@ export class ContextChatPanel {
 
     this.historyButton.disabled = !hasContext || this.state.loading;
     this.newSessionButton.disabled = !hasContext || this.state.loading;
+    this.clearSessionButton.disabled = !hasContext || this.state.loading;
+
+    const provider = getProvider();
+    const oauth = getCodexLoginReport();
+    this.codexAuthButton.disabled = this.state.loading;
+    if (provider != "openai-codex") {
+      this.codexAuthButton.textContent = "Enable Codex";
+      this.codexAuthButton.title = "Switch provider to openai-codex and start OAuth login";
+    } else if (oauth.hasPendingLogin) {
+      this.codexAuthButton.textContent = "Finish Login";
+      this.codexAuthButton.title = "Paste redirect URL or code to finish Codex OAuth login";
+    } else if (hasCodexCredentials()) {
+      this.codexAuthButton.textContent = "Logout Codex";
+      this.codexAuthButton.title = "Clear stored Codex OAuth credentials";
+    } else {
+      this.codexAuthButton.textContent = "Login Codex";
+      this.codexAuthButton.title = "Start ChatGPT/Codex OAuth login";
+    }
+
     this.viewModeButton.disabled = false;
     this.viewModeButton.textContent = this.state.viewMode == "raw" ? "Preview" : "Raw Markdown";
     this.viewModeButton.title = this.state.viewMode == "raw"
