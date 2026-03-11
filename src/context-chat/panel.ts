@@ -21,9 +21,12 @@ function formatTimestamp(timestamp: number) {
   }).format(new Date(timestamp));
 }
 
+const PANEL_WIDTH_STORAGE_KEY = "sonder.contextChat.panelWidth";
+
 export class ContextChatPanel {
   private launcherButton!: HTMLButtonElement;
   private panel!: HTMLDivElement;
+  private resizeHandle!: HTMLDivElement;
   private badge!: HTMLSpanElement;
   private title!: HTMLDivElement;
   private sessionTitle!: HTMLDivElement;
@@ -52,6 +55,7 @@ export class ContextChatPanel {
     snapshot?: SessionSnapshot;
     error?: string;
     resolverInfo?: string;
+    panelWidth?: number;
   } = {
     visible: false,
     loading: false,
@@ -66,7 +70,9 @@ export class ContextChatPanel {
     private readonly ownerWindow: Window,
     private readonly store: ContextChatStore,
     private readonly chatService: ContextChatService,
-  ) {}
+  ) {
+    this.state.panelWidth = this.loadSavedPanelWidth();
+  }
 
   public install() {
     const doc = this.ownerWindow.document;
@@ -115,8 +121,9 @@ export class ContextChatPanel {
         top: 0;
         right: 0;
         z-index: 2147482999;
-        width: min(46vw, 760px);
+        width: var(--sonder-panel-width, min(46vw, 760px));
         min-width: 420px;
+        max-width: 85vw;
         height: 100vh;
         display: none;
         flex-direction: column;
@@ -125,6 +132,28 @@ export class ContextChatPanel {
         box-shadow: -18px 0 48px rgba(15, 23, 42, 0.18);
         border-left: 1px solid rgba(148, 163, 184, 0.2);
         font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      #sonder-context-chat-panel .sonder-resize-handle {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 8px;
+        height: 100%;
+        cursor: col-resize;
+        z-index: 2;
+      }
+      #sonder-context-chat-panel .sonder-resize-handle::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 2px;
+        height: 100%;
+        background: transparent;
+        transition: background 120ms ease;
+      }
+      #sonder-context-chat-panel .sonder-resize-handle:hover::after {
+        background: rgba(59, 130, 246, 0.35);
       }
       #sonder-context-chat-panel .sonder-panel-header {
         padding: 18px 20px 16px;
@@ -520,6 +549,13 @@ export class ContextChatPanel {
     const panel = createHTML(doc, "div");
     panel.id = "sonder-context-chat-panel";
 
+    const resizeHandle = createHTML(doc, "div");
+    resizeHandle.className = "sonder-resize-handle";
+    resizeHandle.title = "Drag to resize";
+    resizeHandle.addEventListener("mousedown", (event) => {
+      this.startResize(event);
+    });
+
     const header = createHTML(doc, "div");
     header.className = "sonder-panel-header";
 
@@ -620,10 +656,12 @@ export class ContextChatPanel {
     composerActions.append(composerNote, sendButton);
     composer.append(composerHint, composerInput, composerActions);
 
-    panel.append(header, messageList, composer);
+    panel.append(resizeHandle, header, messageList, composer);
     doc.documentElement.appendChild(panel);
 
     this.panel = panel;
+    this.resizeHandle = resizeHandle;
+    this.applyPanelWidth();
     this.badge = badge;
     this.title = title;
     this.sessionTitle = sessionTitle;
@@ -638,6 +676,57 @@ export class ContextChatPanel {
     this.composerInput = composerInput;
     this.composerNote = composerNote;
     this.sendButton = sendButton;
+  }
+
+  private loadSavedPanelWidth() {
+    try {
+      const raw = this.ownerWindow.localStorage?.getItem(PANEL_WIDTH_STORAGE_KEY);
+      const width = Number(raw || NaN);
+      return Number.isFinite(width) ? width : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private savePanelWidth(width: number) {
+    try {
+      this.ownerWindow.localStorage?.setItem(PANEL_WIDTH_STORAGE_KEY, String(width));
+    } catch {
+      // ignore persistence failures
+    }
+  }
+
+  private applyPanelWidth() {
+    if (!this.panel || !this.state.panelWidth) {
+      return;
+    }
+    this.panel.style.setProperty("--sonder-panel-width", `${Math.round(this.state.panelWidth)}px`);
+  }
+
+  private startResize(event: MouseEvent) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = this.panel.getBoundingClientRect().width;
+    const minWidth = 420;
+    const maxWidth = Math.floor(this.ownerWindow.innerWidth * 0.85);
+
+    const onMove = (moveEvent: MouseEvent) => {
+      const delta = startX - moveEvent.clientX;
+      const nextWidth = Math.min(maxWidth, Math.max(minWidth, startWidth + delta));
+      this.state.panelWidth = nextWidth;
+      this.applyPanelWidth();
+    };
+
+    const onUp = () => {
+      this.ownerWindow.removeEventListener("mousemove", onMove);
+      this.ownerWindow.removeEventListener("mouseup", onUp);
+      if (this.state.panelWidth) {
+        this.savePanelWidth(this.state.panelWidth);
+      }
+    };
+
+    this.ownerWindow.addEventListener("mousemove", onMove);
+    this.ownerWindow.addEventListener("mouseup", onUp);
   }
 
   private setPaperStatus(status: PaperContextStatus, error?: string) {

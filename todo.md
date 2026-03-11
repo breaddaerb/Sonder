@@ -189,8 +189,8 @@ Main direction: large right-side docked chat panel.
 
 ### 6.5 Resizing and layout
 - [x] Set good default width (target: 40%–50%)
-- [ ] Add resizable width support
-- [ ] Ensure long answers are easy to scroll
+- [x] Add resizable width support
+- [x] Ensure long answers are easy to scroll
 
 ---
 

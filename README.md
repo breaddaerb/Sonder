@@ -91,6 +91,7 @@ Current behavior:
 - the latest saved session is restored automatically per context (`paper` or `item+paper`)
 - `New Session` creates another persisted session for the same context
 - `History` lists saved sessions for the current context
+- drag the panel’s left edge to resize width (width is remembered)
 - the composer is wired to the current provider transport
 - `Send` and `Enter` submit a message
 - `Shift+Enter` inserts a newline
