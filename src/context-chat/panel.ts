@@ -1,5 +1,6 @@
 import ContextChatService, { PaperContextStatus } from "./chatService";
 import { canSendDraft } from "./chatMessages";
+import { resolveSelectedItemPaperContextWithSource } from "./itemPaperContext";
 import { resolveCurrentPaperContext } from "./paperContext";
 import { renderMessageHTML } from "./render";
 import ContextChatStore from "./storage";
@@ -50,6 +51,7 @@ export class ContextChatPanel {
     assistantPreviewText: string;
     snapshot?: SessionSnapshot;
     error?: string;
+    resolverInfo?: string;
   } = {
     visible: false,
     loading: false,
@@ -507,7 +509,7 @@ export class ContextChatPanel {
     button.id = "sonder-context-chat-launcher";
     button.textContent = "Chat";
     button.addEventListener("click", () => {
-      void this.openCurrentPaper();
+      void this.openCurrentContext();
     });
     this.launcherButton = button;
     doc.documentElement.appendChild(button);
@@ -672,7 +674,7 @@ export class ContextChatPanel {
     });
   }
 
-  private async openCurrentPaper() {
+  private async openCurrentContext() {
     this.state.visible = true;
     this.state.loading = true;
     this.state.loadingPhase = "opening";
@@ -682,18 +684,23 @@ export class ContextChatPanel {
     this.setPaperStatus("idle");
     this.render();
 
-    const paperContext = resolveCurrentPaperContext();
-    if (!paperContext) {
+    const itemResolution = await resolveSelectedItemPaperContextWithSource();
+    const itemPaperContext = itemResolution.context;
+    const paperContext = !itemPaperContext ? resolveCurrentPaperContext() : undefined;
+    this.state.resolverInfo = `item-source=${itemResolution.source}; paper=${paperContext ? "yes" : "no"}`;
+    if (!itemPaperContext && !paperContext) {
       this.state.loading = false;
       this.state.loadingPhase = undefined;
       this.state.snapshot = undefined;
-      this.state.error = "Open a PDF reader tab, then click Chat to start a paper session.";
+      this.state.error = `Open a PDF or select an annotation/note item, then click Chat. (${this.state.resolverInfo})`;
       this.render();
       return;
     }
 
     try {
-      this.state.snapshot = await this.store.getOrCreatePaperSession(paperContext);
+      this.state.snapshot = itemPaperContext
+        ? await this.store.getOrCreateItemPaperSession(itemPaperContext)
+        : await this.store.getOrCreatePaperSession(paperContext!);
       this.state.loading = false;
       this.state.loadingPhase = undefined;
       this.state.error = undefined;
@@ -702,7 +709,7 @@ export class ContextChatPanel {
       this.state.loading = false;
       this.state.loadingPhase = undefined;
       this.state.snapshot = undefined;
-      this.state.error = String(error?.message || error || "Failed to open paper session.");
+      this.state.error = String(error?.message || error || "Failed to open context session.");
       Zotero.logError(error);
     }
     this.render();
@@ -941,20 +948,28 @@ export class ContextChatPanel {
 
       const title = createHTML(doc, "div");
       title.className = "sonder-empty-title";
-      title.textContent = this.state.error ? "Paper context unavailable" : this.state.paperStatus == "preparing" ? "Preparing paper context" : "Paper chat is ready";
+      title.textContent = this.state.error
+        ? "Context unavailable"
+        : this.state.paperStatus == "preparing"
+          ? "Preparing paper context"
+          : this.state.snapshot?.context.type == "item+paper"
+            ? "Item + Paper chat is ready"
+            : "Paper chat is ready";
 
       const copy = createHTML(doc, "div");
       copy.className = "sonder-empty-copy";
       copy.textContent = this.state.error
         ? this.state.error
         : this.state.paperStatus == "preparing"
-          ? "Sonder is reading the current PDF and preparing retrievable paper chunks in the background. You can wait for Ready or send immediately and the panel will wait for preparation."
-          : "Ask your first question about the current paper. This conversation is persisted per paper, and reopening the same PDF restores the latest session automatically.";
+          ? "Sonder is reading the parent paper and preparing retrievable chunks in the background. You can wait for Ready or send immediately and the panel will wait for preparation."
+          : this.state.snapshot?.context.type == "item+paper"
+            ? "Ask about the selected annotation/note. Sonder will always force-inject the selected item content and use paper chunks as supplementary context."
+            : "Ask your first question about the current paper. This conversation is persisted per paper, and reopening the same PDF restores the latest session automatically.";
 
       const copy2 = createHTML(doc, "div");
       copy2.className = "sonder-empty-copy";
       copy2.textContent = this.state.error
-        ? "Once a PDF reader tab is active, click Chat again and Sonder will resolve the paper context explicitly."
+        ? "Activate a PDF reader tab or select an annotation/note item, then click Chat again to resolve context."
         : "Assistant output is shown as raw markdown by default. Use the Preview button in the header to switch rendered preview on and off.";
 
       empty.append(title, copy, copy2);
@@ -1013,11 +1028,11 @@ export class ContextChatPanel {
     }
     this.composerInput.disabled = !hasContext || this.state.loading;
     this.composerInput.placeholder = hasContext
-      ? "Ask about this paper"
-      : "Open a PDF reader tab and click Chat to start";
-    this.composerHint.textContent = hasContext
-      ? "Chatting with current paper"
-      : "Open a PDF reader tab and click Chat to resolve paper context";
+      ? this.state.snapshot?.context.type == "item+paper"
+        ? "Ask about the selected annotation/note"
+        : "Ask about this paper"
+      : "Open a PDF reader tab or select an annotation/note, then click Chat";
+    this.composerHint.textContent = this.getComposerHint();
     this.composerNote.textContent = !hasContext
       ? "Paper context is required before you can send a message."
       : this.state.loadingPhase == "sending"
@@ -1050,17 +1065,55 @@ export class ContextChatPanel {
     }, 0);
   }
 
+  private getContextBadgeLabel() {
+    const context = this.state.snapshot?.context;
+    if (!context) {
+      return "Context chat";
+    }
+    if (context.type == "item+paper") {
+      return context.itemKind == "note" ? "Note + Paper" : "Annotation + Paper";
+    }
+    return "Paper";
+  }
+
+  private getContextTitle() {
+    const context = this.state.snapshot?.context;
+    if (!context) {
+      return "Open a PDF or select an annotation/note to start";
+    }
+    if (context.type == "item+paper") {
+      const itemTitle = (context.itemText || "").slice(0, 72);
+      return itemTitle.length > 0 ? `${itemTitle}${context.itemText && context.itemText.length > 72 ? "…" : ""}` : "Selected item + paper";
+    }
+    return context.title;
+  }
+
+  private getComposerHint() {
+    const context = this.state.snapshot?.context;
+    if (!context) {
+      return "Open a PDF reader tab or select an annotation/note, then click Chat";
+    }
+    if (context.type == "item+paper") {
+      return context.itemKind == "note"
+        ? "Chatting with selected note + parent paper"
+        : "Chatting with selected annotation + parent paper";
+    }
+    return "Chatting with current paper";
+  }
+
   private render() {
     const snapshot = this.state.snapshot;
     const hasContext = Boolean(snapshot);
     this.panel.style.display = this.state.visible ? "flex" : "none";
     this.launcherButton.style.display = this.state.visible ? "none" : "";
 
-    this.badge.textContent = hasContext ? "Paper" : "Paper chat";
-    this.title.textContent = hasContext ? snapshot!.context.title : "Open a PDF to start a paper session";
+    this.badge.textContent = this.getContextBadgeLabel();
+    this.title.textContent = this.getContextTitle();
     this.sessionTitle.textContent = hasContext
-      ? `${snapshot!.session.title} · Updated ${formatTimestamp(snapshot!.session.updatedAt)}`
-      : "Persisted paper session";
+      ? snapshot!.context.type == "item+paper"
+        ? `${snapshot!.session.title} · ${snapshot!.context.title} · Updated ${formatTimestamp(snapshot!.session.updatedAt)}${this.state.resolverInfo ? ` · ${this.state.resolverInfo}` : ""}`
+        : `${snapshot!.session.title} · Updated ${formatTimestamp(snapshot!.session.updatedAt)}${this.state.resolverInfo ? ` · ${this.state.resolverInfo}` : ""}`
+      : `Persisted context session${this.state.resolverInfo ? ` · ${this.state.resolverInfo}` : ""}`;
 
     this.status.textContent = this.state.error || this.state.paperStatus == "failed"
       ? "Failed"

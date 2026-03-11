@@ -3,6 +3,7 @@ import { getCurrentModel, getProvider } from "../modules/provider";
 import ContextChatStore from "./storage";
 import { toChatHistory } from "./chatMessages";
 import {
+  buildItemPaperGroundedUserMessage,
   buildPaperGroundedUserMessage,
   createPaperChunkCitations,
   PreparedPaperContext,
@@ -39,7 +40,7 @@ export class ContextChatService {
     context: StoredContext,
     onStatusChange?: (state: PaperContextState) => void,
   ) {
-    if (context.type != "paper" || !context.paperKey) {
+    if (!context.paperKey) {
       return;
     }
     if (this.getPaperContextState(context.id).status == "ready") {
@@ -64,8 +65,8 @@ export class ContextChatService {
     context: StoredContext,
     onStatusChange?: (state: PaperContextState) => void,
   ) {
-    if (context.type != "paper" || !context.paperKey) {
-      throw new Error("Only paper context is supported in the current panel retrieval flow.");
+    if (!context.paperKey) {
+      throw new Error("Paper key is required to prepare retrieval context.");
     }
     const cached = this.preparedPapers.get(context.id);
     if (cached) {
@@ -123,16 +124,34 @@ export class ContextChatService {
     }
     callbacks.onUserSnapshot?.(snapshot);
 
-    const preparedPaper = await this.ensurePreparedPaperContext(snapshot.context, callbacks.onPaperStatusChange);
+    let preparedPaper: PreparedPaperContext | undefined;
+    try {
+      preparedPaper = await this.ensurePreparedPaperContext(snapshot.context, callbacks.onPaperStatusChange);
+    } catch {
+      preparedPaper = {
+        contextId: snapshot.context.id,
+        paperKey: snapshot.context.paperKey || "",
+        title: snapshot.context.title,
+        preparedAt: Date.now(),
+        chunks: [],
+      };
+    }
+
     const relevantChunks = selectRelevantPaperChunks(content, preparedPaper.chunks);
-    const transportHistory = this.buildTransportHistory(
-      snapshot,
-      buildPaperGroundedUserMessage({
-        title: preparedPaper.title,
-        question: content,
-        chunks: relevantChunks,
-      })
-    );
+    const groundedUserMessage = snapshot.context.type == "item+paper"
+      ? buildItemPaperGroundedUserMessage({
+          paperTitle: preparedPaper.title,
+          itemKind: snapshot.context.itemKind || "annotation",
+          itemText: snapshot.context.itemText || "(Selected item content unavailable)",
+          question: content,
+          chunks: relevantChunks,
+        })
+      : buildPaperGroundedUserMessage({
+          title: preparedPaper.title,
+          question: content,
+          chunks: relevantChunks,
+        });
+    const transportHistory = this.buildTransportHistory(snapshot, groundedUserMessage);
 
     const result = await requestProviderChat(transportHistory, {
       onText(text) {

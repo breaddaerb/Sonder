@@ -86,9 +86,11 @@ Current behavior:
 - a visible `Chat` launcher button is mounted in the Zotero main window
 - clicking it with an active PDF reader tab opens a large right-side panel
 - the panel resolves explicit `Paper` context from the current PDF
-- the latest saved session for that paper is restored automatically
-- `New Session` creates another persisted session for the same paper
-- `History` lists saved sessions for the current paper context
+- selecting an annotation/note item in the library and clicking `Chat` opens `Item + Paper` context
+- in `Item + Paper` mode, selected item content is force-injected as primary anchor context
+- the latest saved session is restored automatically per context (`paper` or `item+paper`)
+- `New Session` creates another persisted session for the same context
+- `History` lists saved sessions for the current context
 - the composer is wired to the current provider transport
 - `Send` and `Enter` submit a message
 - `Shift+Enter` inserts a newline
@@ -109,6 +111,7 @@ Current limitation:
 - citation jumping currently targets the relevant PDF page, not a fine-grained paragraph/box location yet
 - math preview quality depends on the model emitting explicit math delimiters consistently, though the panel now nudges it toward `$...$` / `$$...$$`
 - retrieval is currently a simple chunked lexical-ranking implementation, not the final retrieval stack yet
+- item+paper mode always injects selected item text; paper retrieval still depends on available PDF preparation context
 - the legacy shortcut/command UI remains available as a fallback while the rewrite continues
 
 ## Tests

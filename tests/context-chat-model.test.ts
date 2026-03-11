@@ -1,8 +1,14 @@
 import assert from "node:assert/strict";
 import { canSendDraft, toChatHistory } from "../src/context-chat/chatMessages";
-import { buildPaperGroundedUserMessage, createPaperChunkCitations, selectRelevantPaperChunks } from "../src/context-chat/paperRetrieval";
+import {
+  buildItemPaperGroundedUserMessage,
+  buildPaperGroundedUserMessage,
+  createPaperChunkCitations,
+  selectRelevantPaperChunks,
+} from "../src/context-chat/paperRetrieval";
 import { renderMessageHTML } from "../src/context-chat/render";
 import {
+  createItemPaperContextId,
   createPaperContextId,
   createSessionId,
   createSessionTitle,
@@ -12,6 +18,7 @@ import {
 } from "../src/context-chat/types";
 
 assert.equal(createPaperContextId("ABCD1234"), "paper:ABCD1234");
+assert.equal(createItemPaperContextId("ITEM1", "PAPER1"), "itempaper:ITEM1:PAPER1");
 assert.equal(createSessionTitle(3), "Session 3");
 assert.equal(getNextSessionIndex([{ id: "s1" }, { id: "s2" }]), 3);
 assert.match(createSessionId(123456789, 0.5), /^session:123456789:/);
@@ -66,6 +73,17 @@ assert.match(groundedPrompt, /\$\.\.\.\$/);
 assert.match(groundedPrompt, /\$\$\.\.\.\$\$/);
 assert.match(groundedPrompt, /p\.2/);
 assert.match(groundedPrompt, /User question:/);
+
+const itemGroundedPrompt = buildItemPaperGroundedUserMessage({
+  paperTitle: "Attention Paper",
+  itemKind: "annotation",
+  itemText: "Selected highlighted sentence.",
+  question: "What does this sentence imply?",
+  chunks: relevantChunks,
+});
+assert.match(itemGroundedPrompt, /Selected annotation/);
+assert.match(itemGroundedPrompt, /must never be ignored/);
+assert.match(itemGroundedPrompt, /Supplementary paper context/);
 
 const renderedHTML = renderMessageHTML([
   "# Heading",

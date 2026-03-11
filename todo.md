@@ -106,11 +106,11 @@ Conversation history must always be saved.
 - [x] Implement "open latest session or create one" behavior for paper context
 
 ## 4.2 Item + paper context
-- [ ] Detect selected annotation item / note item in Zotero
-- [ ] Resolve parent paper from selected item
-- [ ] Define stable `item+paper` context identity
-- [ ] Implement "open latest session or create one" behavior for item+paper context
-- [ ] Ensure selected item content is always force-injected into context
+- [x] Detect selected annotation item / note item in Zotero
+- [x] Resolve parent paper from selected item
+- [x] Define stable `item+paper` context identity
+- [x] Implement "open latest session or create one" behavior for item+paper context
+- [x] Ensure selected item content is always force-injected into context
 
 ## 4.3 Context switching rules
 - [x] Define how global panel reacts when current selection changes
@@ -128,8 +128,8 @@ Panel opens by explicit button click.
 - [ ] Bind it to paper context opening
 
 ### 5.2 Item entry
-- [ ] Add visible `Chat` entry for selected item workflows
-- [ ] Bind it to item+paper context opening
+- [x] Add visible `Chat` entry for selected item workflows
+- [x] Bind it to item+paper context opening
 
 ### 5.3 Safe fallback entry
 - [ ] Add plugin menu entry / stable fallback opening path
@@ -220,13 +220,13 @@ User promise: when opening chat from a PDF, they can ask about the whole paper.
 
 User promise: the selected item is the anchor, and the paper provides background.
 
-- [ ] Always inject selected item text into context
-- [ ] Retrieve supporting chunks from parent paper
+- [x] Always inject selected item text into context
+- [x] Retrieve supporting chunks from parent paper
 - [ ] Preserve item identity in citations/source UI if relevant
-- [ ] Ensure answers feel about *this item* rather than generic paper summary
+- [x] Ensure answers feel about *this item* rather than generic paper summary
 
 ### Required rule
-- [ ] Item content must never be optional in `item+paper` mode
+- [x] Item content must never be optional in `item+paper` mode
 
 ---
 
@@ -337,10 +337,10 @@ Recommended sequence for happy coding:
 - [x] send/receive basic messages in paper context
 
 ### Phase 4: item + paper context
-- [ ] selected item detection
-- [ ] force-injected item content
-- [ ] paper retrieval supplement
-- [ ] open/create session
+- [x] selected item detection
+- [x] force-injected item content
+- [x] paper retrieval supplement
+- [x] open/create session
 
 ### Phase 5: history/session UX
 - [x] latest session restore

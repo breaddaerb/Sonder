@@ -24,6 +24,7 @@ export function resolveCurrentPaperContext(): PaperContextDescriptor | undefined
       attachmentItemID: attachment.id,
       attachmentKey: attachment.key,
       parentItemID: attachment.parentItem?.id,
+      libraryID: attachment.libraryID,
       title: getPaperTitle(attachment),
     };
   } catch (error: any) {
