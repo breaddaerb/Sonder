@@ -87,6 +87,10 @@ export class ContextChatPanel {
     this.render();
   }
 
+  public open() {
+    void this.openCurrentContext();
+  }
+
   public destroy() {
     this.launcherButton?.remove();
     this.panel?.remove();

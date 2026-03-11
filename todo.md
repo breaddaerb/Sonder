@@ -132,8 +132,8 @@ Panel opens by explicit button click.
 - [x] Bind it to item+paper context opening
 
 ### 5.3 Safe fallback entry
-- [ ] Add plugin menu entry / stable fallback opening path
-- [ ] Ensure opening the panel does not depend on shortcuts
+- [x] Add plugin menu entry / stable fallback opening path
+- [x] Ensure opening the panel does not depend on shortcuts
 
 ### 5.4 Shortcut policy
 - [ ] Decide whether to keep current shortcut only as secondary convenience

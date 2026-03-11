@@ -85,6 +85,7 @@ Current behavior:
 
 - a visible `Chat` launcher button is mounted in the Zotero main window
 - clicking it with an active PDF reader tab opens a large right-side panel
+- a fallback `Sonder Chat Panel` Tools/Add-ons menu entry is installed for stable opening without shortcuts
 - the panel resolves explicit `Paper` context from the current PDF
 - selecting an annotation/note item in the library and clicking `Chat` opens `Item + Paper` context
 - in `Item + Paper` mode, selected item content is force-injected as primary anchor context

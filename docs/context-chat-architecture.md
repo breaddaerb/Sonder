@@ -61,6 +61,7 @@ This is intentional so the new panel can be built incrementally without risking 
 Implemented so far:
 
 - a visible `Chat` launcher button
+- a fallback menu entry (`Sonder Chat Panel`) for stable opening
 - a large right-side global panel shell with draggable width resizing
 - explicit `paper` context resolution from the active reader tab
 - explicit `item+paper` context resolution from selected annotation/note items
