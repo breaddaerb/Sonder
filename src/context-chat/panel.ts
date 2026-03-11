@@ -33,6 +33,7 @@ export class ContextChatPanel {
   private status!: HTMLSpanElement;
   private historyButton!: HTMLButtonElement;
   private newSessionButton!: HTMLButtonElement;
+  private clearSessionButton!: HTMLButtonElement;
   private viewModeButton!: HTMLButtonElement;
   private closeButton!: HTMLButtonElement;
   private historyDrawer!: HTMLDivElement;
@@ -54,7 +55,6 @@ export class ContextChatPanel {
     assistantPreviewText: string;
     snapshot?: SessionSnapshot;
     error?: string;
-    resolverInfo?: string;
     panelWidth?: number;
   } = {
     visible: false,
@@ -594,6 +594,13 @@ export class ContextChatPanel {
       void this.createNewSession();
     });
 
+    const clearSessionButton = createHTML(doc, "button");
+    clearSessionButton.className = "sonder-action";
+    clearSessionButton.textContent = "Clear Session";
+    clearSessionButton.addEventListener("click", () => {
+      void this.clearCurrentSession();
+    });
+
     const viewModeButton = createHTML(doc, "button");
     viewModeButton.className = "sonder-action";
     viewModeButton.addEventListener("click", () => {
@@ -610,7 +617,7 @@ export class ContextChatPanel {
       this.render();
     });
 
-    actionRow.append(historyButton, newSessionButton, viewModeButton, closeButton);
+    actionRow.append(historyButton, newSessionButton, clearSessionButton, viewModeButton, closeButton);
 
     const historyDrawer = createHTML(doc, "div");
     historyDrawer.className = "sonder-history-drawer";
@@ -668,6 +675,7 @@ export class ContextChatPanel {
     this.status = status;
     this.historyButton = historyButton;
     this.newSessionButton = newSessionButton;
+    this.clearSessionButton = clearSessionButton;
     this.viewModeButton = viewModeButton;
     this.closeButton = closeButton;
     this.historyDrawer = historyDrawer;
@@ -776,12 +784,11 @@ export class ContextChatPanel {
     const itemResolution = await resolveSelectedItemPaperContextWithSource();
     const itemPaperContext = itemResolution.context;
     const paperContext = !itemPaperContext ? resolveCurrentPaperContext() : undefined;
-    this.state.resolverInfo = `item-source=${itemResolution.source}; paper=${paperContext ? "yes" : "no"}`;
     if (!itemPaperContext && !paperContext) {
       this.state.loading = false;
       this.state.loadingPhase = undefined;
       this.state.snapshot = undefined;
-      this.state.error = `Open a PDF or select an annotation/note item, then click Chat. (${this.state.resolverInfo})`;
+      this.state.error = "Open a PDF or select an annotation/note item, then click Chat.";
       this.render();
       return;
     }
@@ -826,6 +833,38 @@ export class ContextChatPanel {
     } catch (error: any) {
       Zotero.logError(error);
       this.state.error = "Failed to create a new session.";
+    } finally {
+      this.state.loading = false;
+      this.state.loadingPhase = undefined;
+      this.render();
+      this.startPaperPreparation();
+      this.focusComposer();
+    }
+  }
+
+  private async clearCurrentSession() {
+    const sessionId = this.state.snapshot?.session.id;
+    if (!sessionId) {
+      return;
+    }
+    if (!this.ownerWindow.confirm("Clear all messages in the current session? This cannot be undone.")) {
+      return;
+    }
+    this.state.loading = true;
+    this.state.loadingPhase = "opening";
+    this.render();
+    try {
+      const snapshot = await this.store.clearSessionMessages(sessionId);
+      if (snapshot) {
+        this.state.snapshot = snapshot;
+        this.syncPaperStatus();
+      }
+      this.state.historyOpen = false;
+      this.state.error = undefined;
+      this.state.assistantPreviewText = "";
+    } catch (error: any) {
+      Zotero.logError(error);
+      this.state.error = "Failed to clear current session.";
     } finally {
       this.state.loading = false;
       this.state.loadingPhase = undefined;
@@ -1216,9 +1255,9 @@ export class ContextChatPanel {
     this.title.textContent = this.getContextTitle();
     this.sessionTitle.textContent = hasContext
       ? snapshot!.context.type == "item+paper"
-        ? `${snapshot!.session.title} · ${snapshot!.context.title} · Updated ${formatTimestamp(snapshot!.session.updatedAt)}${this.state.resolverInfo ? ` · ${this.state.resolverInfo}` : ""}`
-        : `${snapshot!.session.title} · Updated ${formatTimestamp(snapshot!.session.updatedAt)}${this.state.resolverInfo ? ` · ${this.state.resolverInfo}` : ""}`
-      : `Persisted context session${this.state.resolverInfo ? ` · ${this.state.resolverInfo}` : ""}`;
+        ? `${snapshot!.session.title} · ${snapshot!.context.title} · Updated ${formatTimestamp(snapshot!.session.updatedAt)}`
+        : `${snapshot!.session.title} · Updated ${formatTimestamp(snapshot!.session.updatedAt)}`
+      : "Persisted context session";
 
     this.status.textContent = this.state.error || this.state.paperStatus == "failed"
       ? "Failed"
@@ -1234,6 +1273,7 @@ export class ContextChatPanel {
 
     this.historyButton.disabled = !hasContext || this.state.loading;
     this.newSessionButton.disabled = !hasContext || this.state.loading;
+    this.clearSessionButton.disabled = !hasContext || this.state.loading;
     this.viewModeButton.disabled = false;
     this.viewModeButton.textContent = this.state.viewMode == "raw" ? "Preview" : "Raw Markdown";
     this.viewModeButton.title = this.state.viewMode == "raw"

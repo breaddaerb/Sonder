@@ -92,7 +92,7 @@ Conversation history must always be saved.
   - [x] load recent session for context
   - [x] list sessions for context
   - [x] create new session
-  - [ ] clear/delete session (if included in V1)
+  - [x] clear/delete session (if included in V1)
 - [x] Add migration-safe error handling
 - [ ] Add simple dev inspection/logging helpers
 
@@ -153,15 +153,15 @@ Main direction: large right-side docked chat panel.
 ### 6.2 Header
 - [x] Show context badge
   - [x] `Paper`
-  - [ ] `Annotation + Paper`
-  - [ ] `Note + Paper`
+  - [x] `Annotation + Paper`
+  - [x] `Note + Paper`
 - [x] Show context title
 - [x] Show current session title/label
 - [x] Add header actions
   - [x] `New Session`
   - [x] `History`
   - [x] `Raw Markdown` / `Preview`
-  - [ ] `Clear Current Session`
+  - [x] `Clear Current Session`
   - [ ] optional `Settings`
 - [x] Add status indicator
   - [x] preparing
@@ -185,7 +185,7 @@ Main direction: large right-side docked chat panel.
 - [x] Send button
 - [x] Context hint text
   - [x] `Chatting with current paper`
-  - [ ] `Chatting with selected annotation + paper`
+  - [x] `Chatting with selected annotation + paper`
 
 ### 6.5 Resizing and layout
 - [x] Set good default width (target: 40%–50%)

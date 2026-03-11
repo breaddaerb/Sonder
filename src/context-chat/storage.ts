@@ -242,6 +242,23 @@ export class ContextChatStore {
     return this.buildSnapshot(context, session);
   }
 
+  public async clearSessionMessages(sessionId: string): Promise<SessionSnapshot | undefined> {
+    await this.ready();
+    const session = this.cache.sessions[sessionId];
+    if (!session) {
+      return undefined;
+    }
+    const context = this.cache.contexts[session.contextId];
+    if (!context) {
+      return undefined;
+    }
+    this.cache.messages[sessionId] = [];
+    const now = Date.now();
+    this.touchSession(context, session, now);
+    await this.persist();
+    return this.buildSnapshot(context, session);
+  }
+
   public async listSessions(contextId: string) {
     await this.ready();
     return this.getSessionsForContext(contextId);

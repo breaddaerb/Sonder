@@ -66,6 +66,7 @@ Implemented so far:
 - explicit `item+paper` context resolution from selected annotation/note items
 - persisted session creation/loading for both `paper` and `item+paper` contexts
 - history/new-session flow per context
+- clear-current-session action (message reset within active session)
 - composer send button + `Enter` / `Shift+Enter` behavior
 - basic multi-turn send/receive using the existing provider transport stack
 - background paper preparation from the active PDF reader
