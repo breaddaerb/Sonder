@@ -10,7 +10,7 @@ import {
   readCurrentReaderPaperChunks,
   selectRelevantPaperChunks,
 } from "./paperRetrieval";
-import { SessionSnapshot, StoredContext } from "./types";
+import { Citation, SessionSnapshot, StoredContext } from "./types";
 
 export type PaperContextStatus = "idle" | "preparing" | "ready" | "failed";
 
@@ -110,6 +110,20 @@ export class ContextChatService {
     return history;
   }
 
+  private buildAssistantCitations(context: StoredContext, relevantChunks: PreparedPaperContext["chunks"]): Citation[] {
+    const citations = createPaperChunkCitations(relevantChunks);
+    if (context.type == "item+paper" && context.itemKey) {
+      citations.unshift({
+        id: `item:${context.itemKey}`,
+        label: context.itemKind == "note" ? "Selected note" : "Selected annotation",
+        sourceType: "item",
+        target: `item:${context.libraryID || ""}:${context.itemKey}`,
+        preview: context.itemText?.slice(0, 240),
+      });
+    }
+    return citations;
+  }
+
   public async sendMessage(
     sessionId: string,
     content: string,
@@ -162,7 +176,7 @@ export class ContextChatService {
     snapshot = await this.store.appendMessage(sessionId, "assistant", result.content, {
       provider: result.provider,
       model: result.model,
-      citations: createPaperChunkCitations(relevantChunks),
+      citations: this.buildAssistantCitations(snapshot.context, relevantChunks),
     });
     if (!snapshot) {
       throw new Error("Session not found while saving the assistant response.");

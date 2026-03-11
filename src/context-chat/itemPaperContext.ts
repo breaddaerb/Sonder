@@ -140,6 +140,10 @@ async function resolveFromReader(reader: _ZoteroTypes.ReaderInstance | undefined
     return fromAnnotationItem(apiAnnotation);
   }
 
+  const selectedNodes = reader._iframeWindow?.document?.querySelectorAll("[id^=annotation-].selected") as
+    | NodeListOf<Element>
+    | undefined;
+
   const internalState = (reader as any)?._internalReader?._state;
   const selectedIDs = (internalState?.selectedAnnotationIDs || []) as string[];
   const stateAnnotations = (internalState?.annotations || []) as any[];
@@ -151,16 +155,11 @@ async function resolveFromReader(reader: _ZoteroTypes.ReaderInstance | undefined
     }
   }
 
-  const selectedNodes = reader._iframeWindow?.document?.querySelectorAll("[id^=annotation-].selected") as
-    | NodeListOf<Element>
-    | undefined;
   const selectedKey = selectedNodes?.[0]?.id?.split("-")?.[1];
   if (!selectedKey) {
     return undefined;
   }
-  const annotation = attachment
-    .getAnnotations(false)
-    .find((anno) => anno.key == selectedKey);
+  const annotation = attachment.getAnnotations(false).find((anno) => anno.key == selectedKey);
   if (!annotation) {
     return undefined;
   }
@@ -174,19 +173,7 @@ async function resolveReaderSelectedAnnotationContext(): Promise<ItemPaperContex
   } catch {
     currentReader = undefined;
   }
-  const currentResolved = await resolveFromReader(currentReader);
-  if (currentResolved) {
-    return currentResolved;
-  }
-
-  const readers = ((Zotero.Reader as any)?._readers || []) as _ZoteroTypes.ReaderInstance[];
-  for (const reader of readers) {
-    const resolved = await resolveFromReader(reader);
-    if (resolved) {
-      return resolved;
-    }
-  }
-  return undefined;
+  return await resolveFromReader(currentReader);
 }
 
 async function resolveMainWindowSelectedAnnotationContext(): Promise<ItemPaperContextDescriptor | undefined> {

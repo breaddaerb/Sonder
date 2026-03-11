@@ -98,7 +98,8 @@ Current behavior:
 - the panel prepares chunked paper context from the active PDF and retrieves relevant chunks per question
 - responses are now grounded with retrieved paper context in the panel transport path
 - assistant messages show lightweight citation chips for retrieved paper chunks
-- clicking a citation chip jumps back to the relevant PDF page
+- in `Item + Paper` mode, assistant citations include a `Selected annotation/note` chip to preserve item identity
+- clicking a citation chip jumps back to the relevant PDF page, or selects the cited item for item-source chips
 - assistant output is shown as raw markdown by default
 - streaming stays in raw markdown form for stability
 - a header toggle switches between `Raw Markdown` and rendered `Preview`

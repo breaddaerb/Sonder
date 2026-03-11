@@ -856,9 +856,25 @@ export class ContextChatPanel {
     this.historyDrawer.append(meta, list);
   }
 
-  private async jumpToCitation(target?: string, page?: number) {
+  private async jumpToCitation(citation: { sourceType: "paper" | "item"; target?: string; page?: number }) {
     try {
-      const resolvedPage = page || (target?.startsWith("page:") ? Number(target.slice(5)) : 0);
+      if (citation.sourceType == "item" && citation.target?.startsWith("item:")) {
+        const [, libraryStr, itemKey] = citation.target.split(":");
+        const libraryID = Number(libraryStr || NaN);
+        if (!itemKey || Number.isNaN(libraryID)) {
+          return;
+        }
+        const item = Zotero.Items.getByLibraryAndKey(libraryID, itemKey) as Zotero.Item | false;
+        if (!item) {
+          return;
+        }
+
+        ZoteroPane.selectItem(item.id);
+        return;
+      }
+
+      const target = citation.target;
+      const resolvedPage = citation.page || (target?.startsWith("page:") ? Number(target.slice(5)) : 0);
       if (!resolvedPage) {
         return;
       }
@@ -1010,7 +1026,7 @@ export class ContextChatPanel {
             chip.title = citation.preview;
           }
           chip.addEventListener("click", () => {
-            void this.jumpToCitation(citation.target, citation.page);
+            void this.jumpToCitation(citation);
           });
           citations.appendChild(chip);
         });

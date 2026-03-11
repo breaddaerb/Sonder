@@ -72,6 +72,7 @@ Implemented so far:
 - chunked paper retrieval and prompt grounding in the new panel transport path
 - item+paper prompt path where selected item text is always force-injected and paper chunks are supplementary
 - lightweight citation chips on assistant messages with PDF page jump behavior
+- item+paper assistant messages include selected-item citation chips that can re-select the item in Zotero
 - raw-markdown-first assistant output with a header toggle between `Raw Markdown` and rendered `Preview`
 - optional preview rendering for readable headings, lists, tables, code blocks, and KaTeX/MathML-based math rendering after streaming completes
 
@@ -79,7 +80,7 @@ Still later:
 
 - finer-grained source jumps beyond page-level navigation
 - richer/final retrieval strategy beyond the initial lexical chunk ranking
-- richer item+paper source identity/citations (including direct item-source navigation)
+- finer item-source navigation/highlighting beyond simple item selection
 
 ## Context switching rule for now
 

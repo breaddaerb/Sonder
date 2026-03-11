@@ -222,7 +222,7 @@ User promise: the selected item is the anchor, and the paper provides background
 
 - [x] Always inject selected item text into context
 - [x] Retrieve supporting chunks from parent paper
-- [ ] Preserve item identity in citations/source UI if relevant
+- [x] Preserve item identity in citations/source UI if relevant
 - [x] Ensure answers feel about *this item* rather than generic paper summary
 
 ### Required rule
@@ -271,7 +271,7 @@ A core value of paper chat is being able to jump back to source.
   - [x] jump to PDF region for paper chunks
   - [ ] jump to a finer-grained paragraph/box region instead of page-level only
   - [ ] visually highlight/mark the relevant cited content after jump
-  - [ ] select Zotero item for item sources where appropriate
+  - [x] select Zotero item for item sources where appropriate
 - [x] Make citations visible but not visually noisy
 
 ---
