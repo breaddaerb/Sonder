@@ -93,6 +93,7 @@ Current behavior:
 - `New Session` creates another persisted session for the same context
 - `History` lists saved sessions for the current context
 - `Clear Session` clears messages in the active session with confirmation
+- panel header includes Codex auth actions (`Enable/Login/Finish/Logout Codex`) so OAuth does not depend on slash commands
 - drag the panel’s left edge to resize width (width is remembered)
 - the composer is wired to the current provider transport
 - `Send` and `Enter` submit a message

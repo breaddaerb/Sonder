@@ -136,8 +136,8 @@ Panel opens by explicit button click.
 - [x] Ensure opening the panel does not depend on shortcuts
 
 ### 5.4 Shortcut policy
-- [ ] Decide whether to keep current shortcut only as secondary convenience
-- [ ] Ensure shortcut is not the primary UX dependency
+- [x] Decide whether to keep current shortcut only as secondary convenience
+- [x] Ensure shortcut is not the primary UX dependency
 
 ---
 
@@ -310,7 +310,7 @@ These are not blockers for the migration baseline, but they should be cleaned up
 
 - [ ] Investigate inherited non-fatal toolkit warning:
   - [ ] `TypeError: this.getGlobal(...).get(...) is not a constructor`
-- [ ] Remove temporary development auto-open hack once new panel entry exists
+- [x] Remove temporary development auto-open hack once new panel entry exists
 - [ ] Remove/bootstrap debug marker code when no longer needed
 - [ ] Clean up leftover predecessor naming in docs/comments where appropriate
 - [ ] Decide whether old inherited assets/tags should stay in repo or move to legacy folder

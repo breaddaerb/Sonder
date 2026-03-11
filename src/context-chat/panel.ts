@@ -2,6 +2,8 @@ import ContextChatService, { PaperContextStatus } from "./chatService";
 import { canSendDraft } from "./chatMessages";
 import { resolveSelectedItemPaperContextWithSource } from "./itemPaperContext";
 import { resolveCurrentPaperContext } from "./paperContext";
+import { clearCodexLogin, finishCodexOAuthLogin, getCodexLoginReport, startCodexOAuthLogin } from "../modules/Meet/CodexOAuth";
+import { getCurrentModel, getProvider, hasCodexCredentials, setProvider } from "../modules/provider";
 import { renderMessageHTML } from "./render";
 import ContextChatStore from "./storage";
 import { SessionSnapshot, StoredMessage } from "./types";
@@ -34,6 +36,7 @@ export class ContextChatPanel {
   private historyButton!: HTMLButtonElement;
   private newSessionButton!: HTMLButtonElement;
   private clearSessionButton!: HTMLButtonElement;
+  private codexAuthButton!: HTMLButtonElement;
   private viewModeButton!: HTMLButtonElement;
   private closeButton!: HTMLButtonElement;
   private historyDrawer!: HTMLDivElement;
@@ -605,6 +608,12 @@ export class ContextChatPanel {
       void this.clearCurrentSession();
     });
 
+    const codexAuthButton = createHTML(doc, "button");
+    codexAuthButton.className = "sonder-action";
+    codexAuthButton.addEventListener("click", () => {
+      void this.handleCodexAuth();
+    });
+
     const viewModeButton = createHTML(doc, "button");
     viewModeButton.className = "sonder-action";
     viewModeButton.addEventListener("click", () => {
@@ -621,7 +630,7 @@ export class ContextChatPanel {
       this.render();
     });
 
-    actionRow.append(historyButton, newSessionButton, clearSessionButton, viewModeButton, closeButton);
+    actionRow.append(historyButton, newSessionButton, clearSessionButton, codexAuthButton, viewModeButton, closeButton);
 
     const historyDrawer = createHTML(doc, "div");
     historyDrawer.className = "sonder-history-drawer";
@@ -680,6 +689,7 @@ export class ContextChatPanel {
     this.historyButton = historyButton;
     this.newSessionButton = newSessionButton;
     this.clearSessionButton = clearSessionButton;
+    this.codexAuthButton = codexAuthButton;
     this.viewModeButton = viewModeButton;
     this.closeButton = closeButton;
     this.historyDrawer = historyDrawer;
@@ -875,6 +885,56 @@ export class ContextChatPanel {
       this.render();
       this.startPaperPreparation();
       this.focusComposer();
+    }
+  }
+
+  private async handleCodexAuth() {
+    try {
+      let provider = getProvider();
+      if (provider != "openai-codex") {
+        const shouldSwitch = this.ownerWindow.confirm("Switch provider to openai-codex and start Codex OAuth login?");
+        if (!shouldSwitch) {
+          return;
+        }
+        setProvider("openai-codex");
+        provider = "openai-codex";
+      }
+
+      const report = getCodexLoginReport();
+      if (report.hasPendingLogin) {
+        const pasted = this.ownerWindow.prompt("Paste the redirect URL (or authorization code) to finish Codex login:", "");
+        if (!pasted) {
+          return;
+        }
+        const credentials = await finishCodexOAuthLogin(pasted);
+        this.ownerWindow.alert(`Codex login succeeded. accountId: ${credentials.accountId.slice(0, 6)}... model: ${getCurrentModel("openai-codex")}`);
+        this.render();
+        return;
+      }
+
+      if (hasCodexCredentials()) {
+        const shouldLogout = this.ownerWindow.confirm("Codex is already logged in. Logout now?");
+        if (!shouldLogout) {
+          return;
+        }
+        clearCodexLogin();
+        this.ownerWindow.alert("Cleared Codex OAuth credentials.");
+        this.render();
+        return;
+      }
+
+      const auth = await startCodexOAuthLogin();
+      Zotero.launchURL(auth.url);
+      this.ownerWindow.alert([
+        "Opened ChatGPT login page in your browser.",
+        "",
+        "After browser redirect fails on localhost (expected), copy the full URL.",
+        "Then click 'Finish Login' in panel header and paste it.",
+      ].join("\n"));
+      this.render();
+    } catch (error: any) {
+      this.ownerWindow.alert(String(error?.message || error || "Codex auth failed."));
+      this.render();
     }
   }
 
@@ -1278,6 +1338,24 @@ export class ContextChatPanel {
     this.historyButton.disabled = !hasContext || this.state.loading;
     this.newSessionButton.disabled = !hasContext || this.state.loading;
     this.clearSessionButton.disabled = !hasContext || this.state.loading;
+
+    const provider = getProvider();
+    const oauth = getCodexLoginReport();
+    this.codexAuthButton.disabled = this.state.loading;
+    if (provider != "openai-codex") {
+      this.codexAuthButton.textContent = "Enable Codex";
+      this.codexAuthButton.title = "Switch provider to openai-codex and start OAuth login";
+    } else if (oauth.hasPendingLogin) {
+      this.codexAuthButton.textContent = "Finish Login";
+      this.codexAuthButton.title = "Paste redirect URL or code to finish Codex OAuth login";
+    } else if (hasCodexCredentials()) {
+      this.codexAuthButton.textContent = "Logout Codex";
+      this.codexAuthButton.title = "Clear stored Codex OAuth credentials";
+    } else {
+      this.codexAuthButton.textContent = "Login Codex";
+      this.codexAuthButton.title = "Start ChatGPT/Codex OAuth login";
+    }
+
     this.viewModeButton.disabled = false;
     this.viewModeButton.textContent = this.state.viewMode == "raw" ? "Preview" : "Raw Markdown";
     this.viewModeButton.title = this.state.viewMode == "raw"
