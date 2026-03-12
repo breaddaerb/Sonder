@@ -6,6 +6,10 @@ export interface Citation {
   sourceType: "paper" | "item";
   target?: string;
   page?: number;
+  /** Y-coordinate for fine-grained scroll position within the page (PDF coordinate system). */
+  yOffset?: number;
+  /** Y-coordinate of the bottom edge of the cited chunk region (PDF coordinate system). */
+  yOffsetBottom?: number;
   preview?: string;
 }
 

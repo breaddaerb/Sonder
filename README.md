@@ -133,7 +133,8 @@ Current behavior:
 - responses are now grounded with retrieved paper context in the panel transport path
 - assistant messages show lightweight citation chips for retrieved paper chunks
 - in `Item + Paper` mode, assistant citations include a `Selected annotation/note` chip to preserve item identity
-- clicking a citation chip jumps back to the relevant PDF page, or selects the cited item for item-source chips
+- clicking a citation chip jumps back to the relevant PDF paragraph region (fine-grained y-offset), or selects the cited item for item-source chips
+- citation chips only appear for chunks the model explicitly cited in its response (e.g., `[1]`, `[3]`), keeping the UI consistent with the model's text
 - assistant output is shown as raw markdown by default
 - streaming stays in raw markdown form for stability
 - a header toggle switches between `Raw Markdown` and rendered `Preview`
@@ -145,7 +146,7 @@ Current behavior:
 
 Current limitation:
 
-- citation jumping currently targets the relevant PDF page, not a fine-grained paragraph/box location yet (for snapshots, all chunks are labeled as page 1)
+- citation jumping scrolls to the approximate paragraph region within a PDF page using y-coordinate offsets from text extraction (for snapshots, all chunks are labeled as page 1 without sub-page positioning)
 - math preview quality depends on the model emitting explicit math delimiters consistently, though the panel now nudges it toward `$...$` / `$$...$$`
 - retrieval is currently a simple chunked lexical-ranking implementation, not the final retrieval stack yet
 - item+paper mode always injects selected item text; paper retrieval still depends on available PDF preparation context

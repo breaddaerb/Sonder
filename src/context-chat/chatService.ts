@@ -6,6 +6,7 @@ import {
   buildItemPaperGroundedUserMessage,
   buildPaperGroundedUserMessage,
   createPaperChunkCitations,
+  parseCitedIndices,
   PreparedPaperContext,
   readCurrentReaderPaperChunks,
   selectRelevantPaperChunks,
@@ -110,8 +111,16 @@ export class ContextChatService {
     return history;
   }
 
-  private buildAssistantCitations(context: StoredContext, relevantChunks: PreparedPaperContext["chunks"]): Citation[] {
-    const citations = createPaperChunkCitations(relevantChunks);
+  private buildAssistantCitations(
+    context: StoredContext,
+    relevantChunks: PreparedPaperContext["chunks"],
+    assistantResponseText: string,
+  ): Citation[] {
+    // Only show citation chips for chunks the model explicitly cited in its response.
+    const citedIndices = parseCitedIndices(assistantResponseText, relevantChunks.length);
+    const citedChunks = citedIndices.map((i) => relevantChunks[i - 1]);
+    const citations = createPaperChunkCitations(citedChunks, citedIndices);
+
     if (context.type == "item+paper" && context.itemKey) {
       citations.unshift({
         id: `item:${context.itemKey}`,
@@ -176,7 +185,7 @@ export class ContextChatService {
     snapshot = await this.store.appendMessage(sessionId, "assistant", result.content, {
       provider: result.provider,
       model: result.model,
-      citations: this.buildAssistantCitations(snapshot.context, relevantChunks),
+      citations: this.buildAssistantCitations(snapshot.context, relevantChunks, result.content),
     });
     if (!snapshot) {
       throw new Error("Session not found while saving the assistant response.");
