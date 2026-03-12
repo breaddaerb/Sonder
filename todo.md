@@ -278,6 +278,24 @@ The panel now supports configuring a custom OpenAI-compatible API endpoint along
 
 ---
 
+## 10.2 Webpage snapshot support
+
+The context chat panel now supports webpage snapshot (HTML) attachments alongside PDFs.
+
+- [x] Add `isSupportedAttachment()` and `isSnapshotAttachment()` helpers in `paperContext.ts`
+- [x] Expand `resolveCurrentPaperContext()` to accept snapshot attachments
+- [x] Add `extractSnapshotText()` for DOM-based text extraction from HTML snapshots
+- [x] Add `readSnapshotChunks()` for chunking snapshot text
+- [x] Refactor `readCurrentReaderPaperChunks()` to dispatch between PDF and snapshot extraction
+- [x] Update `resolveFromReader()` in `itemPaperContext.ts` to accept snapshot attachments
+- [x] Update `getAttachmentFromNote()` to find snapshot attachments
+- [x] Update `fromAnnotationItem()` to accept snapshot parent attachments
+- [x] Improve error messages in panel for unsupported attachment types
+- [x] Update all user-facing "PDF" references to include "snapshot"
+- [ ] Manual verification: open webpage snapshot, click Chat, verify text extraction and chat
+
+---
+
 ## 11. Source citations and navigation
 
 A core value of paper chat is being able to jump back to source.

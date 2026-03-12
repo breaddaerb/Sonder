@@ -113,9 +113,9 @@ The rewrite now includes an experimental paper-chat panel alongside the preserve
 Current behavior:
 
 - a visible `Chat` launcher button is mounted in the Zotero main window
-- clicking it with an active PDF reader tab opens a large right-side panel
+- clicking it with an active PDF or webpage snapshot reader tab opens a large right-side panel
 - a fallback `Sonder Chat Panel` Tools/Add-ons menu entry is installed for stable opening without shortcuts
-- the panel resolves explicit `Paper` context from the current PDF
+- the panel resolves explicit `Paper` context from the current PDF or webpage snapshot
 - selecting an annotation/note item in the library and clicking `Chat` opens `Item + Paper` context
 - in `Item + Paper` mode, selected item content is force-injected as primary anchor context
 - the latest saved session is restored automatically per context (`paper` or `item+paper`)
@@ -129,7 +129,7 @@ Current behavior:
 - `Send` and `Enter` submit a message
 - `Shift+Enter` inserts a newline
 - multi-turn user/assistant messages are persisted per session
-- the panel prepares chunked paper context from the active PDF and retrieves relevant chunks per question
+- the panel prepares chunked context from the active PDF or webpage snapshot and retrieves relevant chunks per question
 - responses are now grounded with retrieved paper context in the panel transport path
 - assistant messages show lightweight citation chips for retrieved paper chunks
 - in `Item + Paper` mode, assistant citations include a `Selected annotation/note` chip to preserve item identity
@@ -145,7 +145,7 @@ Current behavior:
 
 Current limitation:
 
-- citation jumping currently targets the relevant PDF page, not a fine-grained paragraph/box location yet
+- citation jumping currently targets the relevant PDF page, not a fine-grained paragraph/box location yet (for snapshots, all chunks are labeled as page 1)
 - math preview quality depends on the model emitting explicit math delimiters consistently, though the panel now nudges it toward `$...$` / `$$...$$`
 - retrieval is currently a simple chunked lexical-ranking implementation, not the final retrieval stack yet
 - item+paper mode always injects selected item text; paper retrieval still depends on available PDF preparation context

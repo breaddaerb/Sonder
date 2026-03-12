@@ -840,7 +840,7 @@ export class ContextChatPanel {
       this.state.loading = false;
       this.state.loadingPhase = undefined;
       this.state.snapshot = undefined;
-      this.state.error = "Open a PDF or select an annotation/note item, then click Chat.";
+      this.state.error = "Open a PDF or webpage snapshot, or select an annotation/note item, then click Chat. Other attachment types are not yet supported.";
       this.render();
       return;
     }
@@ -1332,7 +1332,7 @@ export class ContextChatPanel {
       const copy2 = createHTML(doc, "div");
       copy2.className = "sonder-empty-copy";
       copy2.textContent = this.state.error
-        ? "Activate a PDF reader tab or select an annotation/note item, then click Chat again to resolve context."
+        ? "Activate a PDF or snapshot reader tab, or select an annotation/note item, then click Chat again to resolve context."
         : "Assistant output is shown as raw markdown by default. Use the Preview button in the header to switch rendered preview on and off.";
 
       empty.append(title, copy, copy2);
@@ -1413,10 +1413,10 @@ export class ContextChatPanel {
       ? this.state.snapshot?.context.type == "item+paper"
         ? "Ask about the selected annotation/note"
         : "Ask about this paper"
-      : "Open a PDF reader tab or select an annotation/note, then click Chat";
+      : "Open a PDF or snapshot, or select an annotation/note, then click Chat";
     this.composerHint.textContent = this.getComposerHint();
     this.composerNote.textContent = !hasContext
-      ? "Paper context is required before you can send a message."
+      ? "Document context is required before you can send a message."
       : this.state.loadingPhase == "sending"
         ? this.state.paperStatus == "preparing"
           ? "Preparing paper context, then generating a grounded response…"
@@ -1461,7 +1461,7 @@ export class ContextChatPanel {
   private getContextTitle() {
     const context = this.state.snapshot?.context;
     if (!context) {
-      return "Open a PDF or select an annotation/note to start";
+      return "Open a PDF or snapshot, or select an annotation/note to start";
     }
     if (context.type == "item+paper") {
       const itemTitle = (context.itemText || "").slice(0, 72);

@@ -1,4 +1,5 @@
 import { ItemPaperContextDescriptor } from "./types";
+import { isSupportedAttachment } from "./paperContext";
 
 function htmlToText(html: string) {
   try {
@@ -32,13 +33,13 @@ function getAttachmentFromNote(noteItem: Zotero.Item) {
   if (!parent) {
     return undefined;
   }
-  if (parent.isPDFAttachment()) {
+  if (isSupportedAttachment(parent)) {
     return parent;
   }
   const attachmentIDs = parent.getAttachments(false);
   const attachmentItems = attachmentIDs
     .map((id) => Zotero.Items.get(id))
-    .filter((item) => item && item.isPDFAttachment());
+    .filter((item) => item && isSupportedAttachment(item));
   return attachmentItems[0];
 }
 
@@ -73,7 +74,7 @@ async function getNoteText(noteItem: Zotero.Item) {
 
 async function fromAnnotationItem(item: Zotero.Item): Promise<ItemPaperContextDescriptor | undefined> {
   const attachment = item.parentItem;
-  if (!attachment || !attachment.isPDFAttachment()) {
+  if (!attachment || !isSupportedAttachment(attachment)) {
     return undefined;
   }
   const itemText = await getAnnotationText(item);
@@ -129,7 +130,7 @@ async function resolveFromReader(reader: _ZoteroTypes.ReaderInstance | undefined
     return undefined;
   }
   const attachment = Zotero.Items.get(reader.itemID) as Zotero.Item | undefined;
-  if (!attachment || !attachment.isPDFAttachment()) {
+  if (!attachment || !isSupportedAttachment(attachment)) {
     return undefined;
   }
 

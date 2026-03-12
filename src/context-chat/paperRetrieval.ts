@@ -1,4 +1,5 @@
 import { Citation } from "./types";
+import { isSnapshotAttachment } from "./paperContext";
 
 export interface PaperChunk {
   id: string;
@@ -196,16 +197,187 @@ export function buildItemPaperGroundedUserMessage(args: {
   ].join("\n");
 }
 
-export async function readCurrentReaderPaperChunks(expectedAttachmentKey: string, contextId: string, title: string) {
-  const reader = await ztoolkit.Reader.getReader() as _ZoteroTypes.ReaderInstance;
-  if (!reader?.itemID) {
-    throw new Error("No active PDF reader is available to prepare paper context.");
-  }
-  const attachment = Zotero.Items.get(reader.itemID as number);
-  if (!attachment || !attachment.isPDFAttachment() || attachment.key != expectedAttachmentKey) {
-    throw new Error("The active PDF reader does not match the current paper context.");
+/**
+ * Strip HTML tags from a raw HTML string and extract clean text content.
+ * Removes script, style, and other non-content elements before extracting text.
+ */
+function extractTextFromHtmlString(html: string): string {
+  if (!html) {
+    return "";
   }
 
+  // Remove script and style blocks entirely (including content)
+  let cleaned = html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
+    .replace(/<!--[\s\S]*?-->/g, "");
+
+  // Remove nav, header, footer blocks (best-effort for common patterns)
+  cleaned = cleaned
+    .replace(/<nav[\s\S]*?<\/nav>/gi, "")
+    .replace(/<footer[\s\S]*?<\/footer>/gi, "");
+
+  // Replace block-level tags with newlines to preserve paragraph structure
+  cleaned = cleaned
+    .replace(/<\/?(p|div|br|h[1-6]|li|tr|blockquote|section|article|main|aside|pre|hr)[^>]*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, " ");
+
+  // Decode common HTML entities
+  cleaned = cleaned
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&#x27;/gi, "'")
+    .replace(/&#(\d+);/g, (_match, code) => String.fromCharCode(Number(code)));
+
+  // Normalize whitespace
+  return cleaned
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
+ * Try to extract text from the reader's iframe DOM, traversing nested iframes
+ * that Zotero's snapshot reader may use to display the actual HTML content.
+ */
+function extractSnapshotTextFromDom(iframeWindow: any): string {
+  try {
+    // Strategy 1: Direct document access (may work for simple readers)
+    const doc = iframeWindow?.document || iframeWindow?.wrappedJSObject?.document;
+    if (doc?.body) {
+      const directText = (doc.body.textContent || "").replace(/\s+/g, " ").trim();
+      if (directText.length > 200) {
+        return directText;
+      }
+
+      // Strategy 2: Look for nested iframes that contain the actual snapshot content
+      const iframes = doc.querySelectorAll("iframe") as NodeListOf<HTMLIFrameElement>;
+      for (let i = 0; i < iframes.length; i++) {
+        try {
+          const nestedDoc = iframes[i].contentDocument || (iframes[i] as any).contentWindow?.document;
+          if (nestedDoc?.body) {
+            const nestedText = (nestedDoc.body.textContent || "").replace(/\s+/g, " ").trim();
+            if (nestedText.length > 200) {
+              return nestedText;
+            }
+          }
+        } catch {
+          // Cross-origin or dead wrapper — skip
+        }
+      }
+
+      // Strategy 3: Try wrappedJSObject for privileged access to nested iframes
+      try {
+        const wrappedDoc = iframeWindow?.wrappedJSObject?.document;
+        if (wrappedDoc) {
+          const wrappedIframes = wrappedDoc.querySelectorAll("iframe");
+          for (let i = 0; i < wrappedIframes.length; i++) {
+            try {
+              const nestedDoc = wrappedIframes[i].contentDocument;
+              if (nestedDoc?.body) {
+                const nestedText = (nestedDoc.body.textContent || "").replace(/\s+/g, " ").trim();
+                if (nestedText.length > 200) {
+                  return nestedText;
+                }
+              }
+            } catch {
+              // Skip inaccessible frames
+            }
+          }
+        }
+      } catch {
+        // wrappedJSObject access failed
+      }
+
+      // Return whatever direct text we got, even if short
+      if (directText.length > 0) {
+        return directText;
+      }
+    }
+  } catch (error: any) {
+    Zotero.logError(error);
+  }
+  return "";
+}
+
+/**
+ * Read the HTML snapshot file from disk and extract text content.
+ * This is the primary extraction strategy since it doesn't depend on
+ * the reader's iframe DOM structure.
+ */
+async function extractSnapshotTextFromFile(attachment: Zotero.Item): Promise<string> {
+  try {
+    const filePath = await (attachment as any).getFilePathAsync();
+    if (!filePath) {
+      return "";
+    }
+
+    // Check if the file exists
+    if (!(await OS.File.exists(filePath))) {
+      return "";
+    }
+
+    const htmlContent = await Zotero.File.getContentsAsync(filePath) as string;
+    if (!htmlContent) {
+      return "";
+    }
+
+    return extractTextFromHtmlString(htmlContent);
+  } catch (error: any) {
+    Zotero.logError(error);
+    return "";
+  }
+}
+
+/**
+ * Read text chunks from an HTML snapshot attachment.
+ * Uses a multi-strategy approach:
+ * 1. Primary: Read HTML file from disk and parse text (most reliable)
+ * 2. Fallback: Extract from reader iframe DOM (traversing nested iframes)
+ * If both strategies yield no text, returns empty chunks (status will still be "ready").
+ */
+async function readSnapshotChunks(
+  reader: _ZoteroTypes.ReaderInstance,
+  attachment: Zotero.Item,
+  expectedAttachmentKey: string,
+  contextId: string,
+  title: string,
+): Promise<PreparedPaperContext> {
+  // Strategy 1: Read from file (most reliable)
+  let text = await extractSnapshotTextFromFile(attachment);
+
+  // Strategy 2: Try DOM extraction as fallback
+  if (!text && reader._iframeWindow) {
+    text = extractSnapshotTextFromDom(reader._iframeWindow);
+  }
+
+  // Chunk whatever text we got (may be empty — that's OK, status will be "ready")
+  const chunks = text ? chunkText(text, 1) : [];
+
+  return {
+    contextId,
+    paperKey: expectedAttachmentKey,
+    title,
+    preparedAt: Date.now(),
+    chunks,
+  };
+}
+
+/**
+ * Read text chunks from a PDF attachment via the active reader's PDF viewer.
+ */
+async function readPdfChunks(
+  reader: _ZoteroTypes.ReaderInstance,
+  expectedAttachmentKey: string,
+  contextId: string,
+  title: string,
+): Promise<PreparedPaperContext> {
   const PDFViewerApplication = (reader._iframeWindow as any).wrappedJSObject.PDFViewerApplication;
   await PDFViewerApplication.pdfLoadingTask.promise;
   await PDFViewerApplication.pdfViewer.pagesPromise;
@@ -227,5 +399,29 @@ export async function readCurrentReaderPaperChunks(expectedAttachmentKey: string
     title,
     preparedAt: Date.now(),
     chunks,
-  } as PreparedPaperContext;
+  };
+}
+
+export async function readCurrentReaderPaperChunks(expectedAttachmentKey: string, contextId: string, title: string) {
+  const reader = await ztoolkit.Reader.getReader() as _ZoteroTypes.ReaderInstance;
+  if (!reader?.itemID) {
+    throw new Error("No active reader is available to prepare context.");
+  }
+  const attachment = Zotero.Items.get(reader.itemID as number);
+  if (!attachment || attachment.key != expectedAttachmentKey) {
+    throw new Error("The active reader does not match the current context.");
+  }
+
+  if (attachment.isPDFAttachment()) {
+    return await readPdfChunks(reader, expectedAttachmentKey, contextId, title);
+  }
+
+  if (isSnapshotAttachment(attachment)) {
+    return await readSnapshotChunks(reader, attachment, expectedAttachmentKey, contextId, title);
+  }
+
+  const contentType = (attachment as any).attachmentContentType || "unknown";
+  throw new Error(
+    `Unsupported attachment type (${contentType}). Context chat currently supports PDF and webpage snapshot attachments.`
+  );
 }

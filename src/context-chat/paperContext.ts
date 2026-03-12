@@ -10,6 +10,42 @@ function getPaperTitle(attachment: Zotero.Item) {
   );
 }
 
+/**
+ * Check whether an attachment is a type we can extract text from.
+ * Currently supports PDF attachments and HTML/webpage snapshot attachments.
+ */
+export function isSupportedAttachment(attachment: Zotero.Item): boolean {
+  if (attachment.isPDFAttachment()) {
+    return true;
+  }
+  // Webpage snapshots are stored as HTML attachments.
+  // Zotero exposes attachmentContentType on attachment items.
+  try {
+    const contentType = (attachment as any).attachmentContentType as string | undefined;
+    if (contentType && (contentType === "text/html" || contentType === "application/xhtml+xml")) {
+      return true;
+    }
+  } catch {
+    // fall through
+  }
+  return false;
+}
+
+/**
+ * Determine whether an attachment is an HTML/snapshot type (not PDF).
+ */
+export function isSnapshotAttachment(attachment: Zotero.Item): boolean {
+  if (attachment.isPDFAttachment()) {
+    return false;
+  }
+  try {
+    const contentType = (attachment as any).attachmentContentType as string | undefined;
+    return Boolean(contentType && (contentType === "text/html" || contentType === "application/xhtml+xml"));
+  } catch {
+    return false;
+  }
+}
+
 export function resolveCurrentPaperContext(): PaperContextDescriptor | undefined {
   try {
     const reader = Zotero.Reader.getByTabID(Zotero_Tabs.selectedID);
@@ -17,7 +53,7 @@ export function resolveCurrentPaperContext(): PaperContextDescriptor | undefined
       return undefined;
     }
     const attachment = Zotero.Items.get(reader.itemID as number);
-    if (!attachment || !attachment.isPDFAttachment()) {
+    if (!attachment || !isSupportedAttachment(attachment)) {
       return undefined;
     }
     return {
