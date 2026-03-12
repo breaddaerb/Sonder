@@ -109,6 +109,8 @@ Current behavior:
 - a header toggle switches between `Raw Markdown` and rendered `Preview`
 - preview mode renders headings, lists, tables, code blocks, and math expressions after streaming completes
 - preview-mode math now supports `$...$`, `$$...$$`, `\(...\)`, and `\[...\]`
+- message output is selectable/copyable directly in the panel
+- each assistant message includes a `Copy MD` button that copies raw markdown directly
 - raw markdown mode stays easy to copy into tools like Notion
 
 Current limitation:

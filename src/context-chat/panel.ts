@@ -306,6 +306,8 @@ export class ContextChatPanel {
         overflow: auto;
         padding: 20px;
         background: #f8fafc;
+        -moz-user-select: text;
+        user-select: text;
       }
       #sonder-context-chat-panel .sonder-empty-state {
         border: 1px dashed #cbd5e1;
@@ -343,18 +345,45 @@ export class ContextChatPanel {
       #sonder-context-chat-panel .sonder-message.is-streaming {
         border-style: dashed;
       }
+      #sonder-context-chat-panel .sonder-message-meta {
+        margin-bottom: 6px;
+      }
       #sonder-context-chat-panel .sonder-message-role {
         font-size: 11px;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.08em;
         color: #64748b;
-        margin-bottom: 6px;
+      }
+      #sonder-context-chat-panel .sonder-message-footer {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 8px;
+      }
+      #sonder-context-chat-panel .sonder-copy-button {
+        border: 1px solid #dbe2ea;
+        background: #fff;
+        color: #334155;
+        border-radius: 8px;
+        padding: 4px 8px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      #sonder-context-chat-panel .sonder-copy-button:hover {
+        background: #f8fafc;
       }
       #sonder-context-chat-panel .sonder-message-content {
         font-size: 14px;
         line-height: 1.6;
         color: #0f172a;
+        -moz-user-select: text;
+        user-select: text;
+      }
+      #sonder-context-chat-panel .sonder-message-content,
+      #sonder-context-chat-panel .sonder-message-content * {
+        -moz-user-select: text;
+        user-select: text;
       }
       #sonder-context-chat-panel .sonder-message-content.is-plain-text {
         white-space: pre-wrap;
@@ -1091,6 +1120,24 @@ export class ContextChatPanel {
     }
   }
 
+  private async copyMessageContent(rawText: string, button: HTMLButtonElement) {
+    try {
+      if (this.ownerWindow.navigator?.clipboard?.writeText) {
+        await this.ownerWindow.navigator.clipboard.writeText(rawText);
+      } else {
+        new ztoolkit.Clipboard().addText(rawText, "text/unicode").copy();
+      }
+      const previous = button.textContent;
+      button.textContent = "Copied";
+      this.ownerWindow.setTimeout(() => {
+        button.textContent = previous;
+      }, 1200);
+    } catch (error: any) {
+      Zotero.logError(error);
+      this.ownerWindow.alert("Failed to copy message.");
+    }
+  }
+
   private setRawMessageContent(node: HTMLDivElement, rawText: string) {
     node.classList.add("is-plain-text");
     node.replaceChildren();
@@ -1193,9 +1240,13 @@ export class ContextChatPanel {
         node.classList.add("is-streaming");
       }
 
+      const meta = createHTML(doc, "div");
+      meta.className = "sonder-message-meta";
+
       const role = createHTML(doc, "div");
       role.className = "sonder-message-role";
       role.textContent = message.role == "user" ? "You" : "Sonder";
+      meta.appendChild(role);
 
       const content = createHTML(doc, "div");
       content.className = "sonder-message-content";
@@ -1205,7 +1256,7 @@ export class ContextChatPanel {
         this.setRawMessageContent(content, message.content);
       }
 
-      node.append(role, content);
+      node.append(meta, content);
 
       if (message.citations?.length) {
         const citations = createHTML(doc, "div");
@@ -1223,6 +1274,21 @@ export class ContextChatPanel {
           citations.appendChild(chip);
         });
         node.appendChild(citations);
+      }
+
+      if (message.role == "assistant" && message.id != "assistant-preview") {
+        const footer = createHTML(doc, "div");
+        footer.className = "sonder-message-footer";
+        const copyButton = createHTML(doc, "button");
+        copyButton.className = "sonder-copy-button";
+        copyButton.textContent = "Copy MD";
+        copyButton.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          void this.copyMessageContent(message.content, copyButton);
+        });
+        footer.appendChild(copyButton);
+        node.appendChild(footer);
       }
 
       this.messageList.appendChild(node);
