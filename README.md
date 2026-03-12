@@ -77,6 +77,35 @@ Useful commands in the current baseline include:
 /report
 ```
 
+## Provider modes
+
+Sonder supports two provider modes for chat:
+
+### Codex OAuth (default)
+
+Uses ChatGPT/Codex via browser-based OAuth login. No API key required.
+
+1. Click `Login Codex` in the panel header (or `Enable Codex` if not yet on the Codex provider)
+2. Complete the browser login flow
+3. Paste the redirect URL back when prompted
+
+See [`docs/codex-oauth.md`](docs/codex-oauth.md) for details.
+
+### Custom API (OpenAI-compatible)
+
+Uses any OpenAI-compatible API endpoint with a standard API key.
+
+1. Click `Configure API` in the panel header
+2. Enter your **Base URL** (e.g. `https://api.openai.com`, `https://api.deepseek.com`)
+3. Enter your **API Key**
+4. Enter your **Model Name** (e.g. `gpt-4o`, `deepseek-chat`, `claude-3.5-sonnet`)
+5. Sonder sends a test request to verify the connection
+6. On success, the configuration is saved and ready to use
+
+The button shows `API: {model}` when configured. Click it again to reconfigure or clear.
+
+This works with any provider that exposes an OpenAI-compatible `/chat/completions` endpoint. If your provider requires a `/v1/` prefix, include it in the base URL (e.g., `https://api.openai.com/v1`).
+
 ## Experimental paper chat panel
 
 The rewrite now includes an experimental paper-chat panel alongside the preserved legacy popup UI.
@@ -94,6 +123,7 @@ Current behavior:
 - `History` lists saved sessions for the current context
 - `Clear Session` clears messages in the active session with confirmation
 - panel header includes Codex auth actions (`Enable/Login/Finish/Logout Codex`) so OAuth does not depend on slash commands
+- panel header includes a `Configure API` button for setting up a custom OpenAI-compatible API endpoint (base URL + API key + model name) with test-connection validation
 - drag the panel’s left edge to resize width (width is remembered)
 - the composer is wired to the current provider transport
 - `Send` and `Enter` submit a message

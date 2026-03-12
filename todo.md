@@ -1,7 +1,7 @@
 # Sonder TODO
 
 Status: paper-grounded panel chat in progress  
-Last updated: 2026-03-10
+Last updated: 2026-03-12
 
 This file turns `docs/context-chat-spec-v0.1.md` into an implementation-oriented task list.
 
@@ -260,6 +260,21 @@ The new UI/context system should reuse the already working backend pieces.
 - [x] Reuse Codex request path/body logic where sensible
 - [x] Reuse OpenAI API mode where sensible
 - [x] Preserve `/report`-style diagnostics somewhere, even if UI changes later
+
+---
+
+## 10.1 Custom API provider configuration
+
+The panel now supports configuring a custom OpenAI-compatible API endpoint alongside Codex OAuth.
+
+- [x] Add provider helper functions for custom API config (`getCustomApiConfig`, `setCustomApiConfig`, `hasCustomApiConfig`, `clearCustomApiConfig`, `getCustomApiStatusLabel`)
+- [x] Add `testCustomApiConnection()` for validating custom endpoints before saving
+- [x] Add `Configure API` button in panel header (alongside Codex auth button)
+- [x] Implement sequential prompt flow: base URL → API key → model name → test connection
+- [x] Update `render()` to show custom API button state (`Configure API` / `API: {model}`)
+- [x] Update default model pref from `gpt-3.5-turbo` to `gpt-4o`
+- [x] Add unit tests for custom API provider helpers
+- [ ] Manual verification in Zotero: configure custom API, test connection, send a message
 
 ---
 

@@ -287,10 +287,10 @@ async function requestOpenAIChat(
   const secretKey = Zotero.Prefs.get(`${config.addonRef}.secretKey`)
   const temperature = Zotero.Prefs.get(`${config.addonRef}.temperature`)
   let api = Zotero.Prefs.get(`${config.addonRef}.api`) as string
-  api = api.replace(/\/(?:v1)?\/?$/, "")
+  api = api.replace(/\/+$/, "")
   const model = getCurrentModel("openai-api")
   const chatNumber = Zotero.Prefs.get(`${config.addonRef}.chatNumber`) as number
-  const url = `${api}/v1/chat/completions`
+  const url = `${api}/chat/completions`
   let responseText = ""
   try {
     await Zotero.HTTP.request(
@@ -537,4 +537,61 @@ export async function getGPTResponseBy(
     content: result.content
   })
   return result.content
+}
+
+// --- Custom API connection test ---
+
+export type TestConnectionResult =
+  | { success: true; model: string }
+  | { success: false; error: string };
+
+export async function testCustomApiConnection(
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+): Promise<TestConnectionResult> {
+  const normalizedBase = baseUrl.replace(/\/+$/, "");
+  const url = `${normalizedBase}/chat/completions`;
+  try {
+    const response = await Zotero.HTTP.request(
+      "POST",
+      url,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: "hi" }],
+          max_tokens: 1,
+          stream: false,
+        }),
+        responseType: "json",
+        timeout: 15000,
+      },
+    );
+    const data = response?.response;
+    const returnedModel = data?.model || model;
+    if (data?.choices?.length > 0) {
+      return { success: true, model: returnedModel };
+    }
+    return { success: true, model: returnedModel };
+  } catch (error: any) {
+    let message = error?.message || "Unknown error";
+    try {
+      const body = error?.xmlhttp?.response || error?.xmlhttp?.responseText;
+      if (body) {
+        const parsed = typeof body === "string" ? JSON.parse(body) : body;
+        message = parsed?.error?.message || parsed?.message || message;
+      }
+    } catch {
+      // keep original message
+    }
+    const status = error?.status || error?.xmlhttp?.status;
+    if (status) {
+      message = `HTTP ${status}: ${message}`;
+    }
+    return { success: false, error: message };
+  }
 }

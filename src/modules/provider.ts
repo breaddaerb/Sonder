@@ -73,3 +73,49 @@ export function hasCodexCredentials() {
   const credentials = getCodexCredentials();
   return Boolean(credentials.refresh || credentials.access);
 }
+
+// --- Custom API configuration helpers ---
+
+export interface CustomApiConfig {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+}
+
+const DEFAULT_API_BASE_URL = "https://api.openai.com";
+const DEFAULT_API_MODEL = "gpt-4o";
+
+export function getCustomApiConfig(): CustomApiConfig {
+  return {
+    baseUrl: (Zotero.Prefs.get(`${config.addonRef}.api`) as string) || DEFAULT_API_BASE_URL,
+    apiKey: (Zotero.Prefs.get(`${config.addonRef}.secretKey`) as string) || "",
+    model: (Zotero.Prefs.get(`${config.addonRef}.model`) as string) || DEFAULT_API_MODEL,
+  };
+}
+
+export function setCustomApiConfig(cfg: CustomApiConfig) {
+  Zotero.Prefs.set(`${config.addonRef}.api`, cfg.baseUrl || DEFAULT_API_BASE_URL);
+  Zotero.Prefs.set(`${config.addonRef}.secretKey`, cfg.apiKey || "");
+  Zotero.Prefs.set(`${config.addonRef}.model`, cfg.model || DEFAULT_API_MODEL);
+}
+
+export function hasCustomApiConfig(): boolean {
+  const cfg = getCustomApiConfig();
+  return Boolean(cfg.baseUrl) && Boolean(cfg.apiKey);
+}
+
+export function clearCustomApiConfig() {
+  setCustomApiConfig({ baseUrl: DEFAULT_API_BASE_URL, apiKey: "", model: DEFAULT_API_MODEL });
+}
+
+export function getCustomApiStatusLabel(): string {
+  const provider = getProvider();
+  if (provider !== "openai-api") {
+    return "Configure API";
+  }
+  const cfg = getCustomApiConfig();
+  if (!cfg.apiKey) {
+    return "Configure API";
+  }
+  return `API: ${cfg.model || "configured"}`;
+}

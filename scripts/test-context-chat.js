@@ -4,11 +4,16 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-async function main() {
-  const outfile = path.join(os.tmpdir(), `sonder-context-chat-test-${Date.now()}.cjs`);
+const TEST_FILES = [
+  "context-chat-model.test.ts",
+  "custom-api-provider.test.ts",
+];
+
+async function runTestFile(testFile) {
+  const outfile = path.join(os.tmpdir(), `sonder-${testFile.replace(/\.ts$/, "")}-${Date.now()}.cjs`);
   try {
     await esbuild.build({
-      entryPoints: [path.join(__dirname, "..", "tests", "context-chat-model.test.ts")],
+      entryPoints: [path.join(__dirname, "..", "tests", testFile)],
       bundle: true,
       platform: "node",
       format: "cjs",
@@ -23,6 +28,12 @@ async function main() {
     }
   } finally {
     fs.rmSync(outfile, { force: true });
+  }
+}
+
+async function main() {
+  for (const testFile of TEST_FILES) {
+    await runTestFile(testFile);
   }
 }
 

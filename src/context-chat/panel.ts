@@ -3,7 +3,8 @@ import { canSendDraft } from "./chatMessages";
 import { resolveSelectedItemPaperContextWithSource } from "./itemPaperContext";
 import { resolveCurrentPaperContext } from "./paperContext";
 import { clearCodexLogin, finishCodexOAuthLogin, getCodexLoginReport, startCodexOAuthLogin } from "../modules/Meet/CodexOAuth";
-import { getCurrentModel, getProvider, hasCodexCredentials, setProvider } from "../modules/provider";
+import { getCurrentModel, getProvider, hasCodexCredentials, setProvider, getCustomApiConfig, setCustomApiConfig, hasCustomApiConfig, clearCustomApiConfig, getCustomApiStatusLabel } from "../modules/provider";
+import { testCustomApiConnection } from "../modules/Meet/OpenAI";
 import { renderMessageHTML } from "./render";
 import ContextChatStore from "./storage";
 import { SessionSnapshot, StoredMessage } from "./types";
@@ -37,6 +38,7 @@ export class ContextChatPanel {
   private newSessionButton!: HTMLButtonElement;
   private clearSessionButton!: HTMLButtonElement;
   private codexAuthButton!: HTMLButtonElement;
+  private customApiButton!: HTMLButtonElement;
   private viewModeButton!: HTMLButtonElement;
   private closeButton!: HTMLButtonElement;
   private historyDrawer!: HTMLDivElement;
@@ -643,6 +645,12 @@ export class ContextChatPanel {
       void this.handleCodexAuth();
     });
 
+    const customApiButton = createHTML(doc, "button");
+    customApiButton.className = "sonder-action";
+    customApiButton.addEventListener("click", () => {
+      void this.handleCustomApiConfig();
+    });
+
     const viewModeButton = createHTML(doc, "button");
     viewModeButton.className = "sonder-action";
     viewModeButton.addEventListener("click", () => {
@@ -659,7 +667,7 @@ export class ContextChatPanel {
       this.render();
     });
 
-    actionRow.append(historyButton, newSessionButton, clearSessionButton, codexAuthButton, viewModeButton, closeButton);
+    actionRow.append(historyButton, newSessionButton, clearSessionButton, codexAuthButton, customApiButton, viewModeButton, closeButton);
 
     const historyDrawer = createHTML(doc, "div");
     historyDrawer.className = "sonder-history-drawer";
@@ -719,6 +727,7 @@ export class ContextChatPanel {
     this.newSessionButton = newSessionButton;
     this.clearSessionButton = clearSessionButton;
     this.codexAuthButton = codexAuthButton;
+    this.customApiButton = customApiButton;
     this.viewModeButton = viewModeButton;
     this.closeButton = closeButton;
     this.historyDrawer = historyDrawer;
@@ -963,6 +972,105 @@ export class ContextChatPanel {
       this.render();
     } catch (error: any) {
       this.ownerWindow.alert(String(error?.message || error || "Codex auth failed."));
+      this.render();
+    }
+  }
+
+  private async handleCustomApiConfig() {
+    try {
+      const provider = getProvider();
+
+      // If already configured, offer reconfigure or clear
+      if (provider == "openai-api" && hasCustomApiConfig()) {
+        const currentCfg = getCustomApiConfig();
+        const action = this.ownerWindow.confirm(
+          `Custom API is configured:\n\nBase URL: ${currentCfg.baseUrl}\nModel: ${currentCfg.model}\n\nClick OK to reconfigure, or Cancel to clear the current configuration.`
+        );
+        if (!action) {
+          const shouldClear = this.ownerWindow.confirm("Clear the current custom API configuration?");
+          if (shouldClear) {
+            clearCustomApiConfig();
+            this.ownerWindow.alert("Custom API configuration cleared.");
+          }
+          this.render();
+          return;
+        }
+      }
+
+      // If currently on Codex, ask to switch
+      if (provider == "openai-codex") {
+        const shouldSwitch = this.ownerWindow.confirm("Switch provider from Codex to custom API?");
+        if (!shouldSwitch) {
+          return;
+        }
+        setProvider("openai-api");
+      }
+
+      // Step 1: Base URL
+      const currentCfg = getCustomApiConfig();
+      const baseUrl = this.ownerWindow.prompt(
+        "Enter the API base URL (OpenAI-compatible endpoint):",
+        currentCfg.baseUrl || "https://api.openai.com"
+      );
+      if (baseUrl === null) {
+        return;
+      }
+      const trimmedBaseUrl = baseUrl.trim();
+      if (!trimmedBaseUrl) {
+        this.ownerWindow.alert("Base URL cannot be empty.");
+        return;
+      }
+
+      // Step 2: API Key
+      const existingKeyHint = currentCfg.apiKey
+        ? `${currentCfg.apiKey.slice(0, 4)}${"*".repeat(Math.min(20, Math.max(0, currentCfg.apiKey.length - 8)))}${currentCfg.apiKey.slice(-4)}`
+        : "";
+      const apiKey = this.ownerWindow.prompt(
+        "Enter your API key:",
+        existingKeyHint
+      );
+      if (apiKey === null) {
+        return;
+      }
+      const trimmedApiKey = apiKey.trim();
+      if (!trimmedApiKey) {
+        this.ownerWindow.alert("API key cannot be empty.");
+        return;
+      }
+      // If user didn't change the masked key, keep the original
+      const finalApiKey = trimmedApiKey === existingKeyHint ? currentCfg.apiKey : trimmedApiKey;
+
+      // Step 3: Model Name
+      const model = this.ownerWindow.prompt(
+        "Enter the model name (e.g. gpt-4o, deepseek-chat, claude-3.5-sonnet):",
+        currentCfg.model || "gpt-4o"
+      );
+      if (model === null) {
+        return;
+      }
+      const trimmedModel = model.trim();
+      if (!trimmedModel) {
+        this.ownerWindow.alert("Model name cannot be empty.");
+        return;
+      }
+
+      // Step 4: Test Connection
+      this.ownerWindow.alert("Testing connection... This may take a few seconds.");
+      const result = await testCustomApiConnection(trimmedBaseUrl, finalApiKey, trimmedModel);
+
+      if (result.success) {
+        setCustomApiConfig({ baseUrl: trimmedBaseUrl, apiKey: finalApiKey, model: trimmedModel });
+        this.ownerWindow.alert(`Connection successful!\n\nModel: ${result.model}\nBase URL: ${trimmedBaseUrl}\n\nConfiguration saved.`);
+        // Re-initialize context to clear any stale error state from paper
+        // preparation that may have failed while blocking config dialogs were open.
+        void this.openCurrentContext();
+        return;
+      } else {
+        this.ownerWindow.alert(`Connection failed:\n\n${result.error}\n\nConfiguration was NOT saved. Please check your base URL, API key, and model name.`);
+      }
+      this.render();
+    } catch (error: any) {
+      this.ownerWindow.alert(String(error?.message || error || "Custom API configuration failed."));
       this.render();
     }
   }
@@ -1421,6 +1529,14 @@ export class ContextChatPanel {
       this.codexAuthButton.textContent = "Login Codex";
       this.codexAuthButton.title = "Start ChatGPT/Codex OAuth login";
     }
+
+    this.customApiButton.disabled = this.state.loading;
+    const apiLabel = getCustomApiStatusLabel();
+    this.customApiButton.textContent = apiLabel;
+    this.customApiButton.title = hasCustomApiConfig() && provider == "openai-api"
+      ? "Reconfigure or clear the custom API endpoint"
+      : "Configure a custom OpenAI-compatible API endpoint (base URL + API key + model)";
+    this.customApiButton.classList.toggle("is-active", provider == "openai-api" && hasCustomApiConfig());
 
     this.viewModeButton.disabled = false;
     this.viewModeButton.textContent = this.state.viewMode == "raw" ? "Preview" : "Raw Markdown";
