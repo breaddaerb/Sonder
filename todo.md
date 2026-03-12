@@ -171,6 +171,8 @@ Main direction: large right-side docked chat panel.
 ### 6.3 Message area
 - [x] Large scrollable message list
 - [x] User / assistant message separation
+- [x] Message text must be selectable/copyable in panel output
+- [x] Add one-click copy button for assistant messages (copy raw markdown)
 - [x] Markdown rendering
   - [x] Improve code-block readability in panel output
   - [x] Keep rendered output easy to copy/paste into Notion
