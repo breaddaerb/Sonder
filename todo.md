@@ -168,11 +168,11 @@ Main direction: large right-side docked chat panel.
   - [x] preparing
   - [x] ready
   - [x] failed
-- [ ] Reorganize header actions into clear groups
-  - [ ] Session group: `History` / `New Session` / `Clear Session`
-  - [ ] Provider/Auth group: provider + `Login/Logout` actions
-  - [ ] Panel controls group: `Close` isolated at far edge
-- [ ] Reposition `Raw Markdown` / `Preview` control closer to message-level copy workflow
+- [x] Reorganize header actions into clear groups
+  - [x] Session group: `History` / `New Session` / `Clear Session`
+  - [x] Provider/Auth group: provider + `Login/Logout` actions
+  - [x] Panel controls group: `Close` isolated at far edge
+- [x] Reposition `Raw Markdown` / `Preview` control closer to message-level copy workflow
 
 ### 6.3 Message area
 - [x] Large scrollable message list

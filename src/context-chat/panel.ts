@@ -59,6 +59,7 @@ export class ContextChatPanel {
   private viewModeButton!: HTMLButtonElement;
   private closeButton!: HTMLButtonElement;
   private historyDrawer!: HTMLDivElement;
+  private messageToolbar!: HTMLDivElement;
   private messageList!: HTMLDivElement;
   private composerHint!: HTMLDivElement;
   private composerInput!: HTMLTextAreaElement;
@@ -246,8 +247,19 @@ export class ContextChatPanel {
       #sonder-context-chat-panel .sonder-header-actions {
         display: flex;
         align-items: center;
+        gap: 10px;
+      }
+      #sonder-context-chat-panel .sonder-action-group {
+        display: inline-flex;
+        align-items: center;
         gap: 8px;
-        flex-wrap: wrap;
+        padding: 4px;
+        border-radius: 12px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+      }
+      #sonder-context-chat-panel .sonder-header-spacer {
+        flex: 1;
       }
       #sonder-context-chat-panel .sonder-action,
       #sonder-context-chat-panel .sonder-close,
@@ -326,10 +338,18 @@ export class ContextChatPanel {
         font-size: 12px;
         color: #64748b;
       }
+      #sonder-context-chat-panel .sonder-message-toolbar {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px 0;
+        background: #f8fafc;
+      }
       #sonder-context-chat-panel .sonder-message-list {
         flex: 1;
         overflow: auto;
-        padding: 20px;
+        padding: 12px 20px 20px;
         background: #f8fafc;
         -moz-user-select: text;
         user-select: text;
@@ -640,6 +660,9 @@ export class ContextChatPanel {
     const actionRow = createHTML(doc, "div");
     actionRow.className = "sonder-header-actions";
 
+    const sessionGroup = createHTML(doc, "div");
+    sessionGroup.className = "sonder-action-group";
+
     const historyButton = createHTML(doc, "button");
     historyButton.className = "sonder-action";
     historyButton.textContent = "History";
@@ -661,6 +684,10 @@ export class ContextChatPanel {
     clearSessionButton.addEventListener("click", () => {
       void this.clearCurrentSession();
     });
+    sessionGroup.append(historyButton, newSessionButton, clearSessionButton);
+
+    const providerGroup = createHTML(doc, "div");
+    providerGroup.className = "sonder-action-group";
 
     const codexAuthButton = createHTML(doc, "button");
     codexAuthButton.className = "sonder-action";
@@ -673,13 +700,10 @@ export class ContextChatPanel {
     customApiButton.addEventListener("click", () => {
       void this.handleCustomApiConfig();
     });
+    providerGroup.append(codexAuthButton, customApiButton);
 
-    const viewModeButton = createHTML(doc, "button");
-    viewModeButton.className = "sonder-action";
-    viewModeButton.addEventListener("click", () => {
-      this.state.viewMode = this.state.viewMode == "raw" ? "preview" : "raw";
-      this.render();
-    });
+    const spacer = createHTML(doc, "div");
+    spacer.className = "sonder-header-spacer";
 
     const closeButton = createHTML(doc, "button");
     closeButton.className = "sonder-close";
@@ -690,12 +714,23 @@ export class ContextChatPanel {
       this.render();
     });
 
-    actionRow.append(historyButton, newSessionButton, clearSessionButton, codexAuthButton, customApiButton, viewModeButton, closeButton);
+    actionRow.append(sessionGroup, providerGroup, spacer, closeButton);
 
     const historyDrawer = createHTML(doc, "div");
     historyDrawer.className = "sonder-history-drawer";
 
     header.append(topRow, actionRow, historyDrawer);
+
+    const messageToolbar = createHTML(doc, "div");
+    messageToolbar.className = "sonder-message-toolbar";
+
+    const viewModeButton = createHTML(doc, "button");
+    viewModeButton.className = "sonder-action";
+    viewModeButton.addEventListener("click", () => {
+      this.state.viewMode = this.state.viewMode == "raw" ? "preview" : "raw";
+      this.render();
+    });
+    messageToolbar.appendChild(viewModeButton);
 
     const messageList = createHTML(doc, "div");
     messageList.className = "sonder-message-list";
@@ -736,7 +771,7 @@ export class ContextChatPanel {
     composerActions.append(composerNote, sendButton);
     composer.append(composerHint, composerInput, composerActions);
 
-    panel.append(resizeHandle, header, messageList, composer);
+    panel.append(resizeHandle, header, messageToolbar, messageList, composer);
     doc.documentElement.appendChild(panel);
 
     this.panel = panel;
@@ -754,6 +789,7 @@ export class ContextChatPanel {
     this.viewModeButton = viewModeButton;
     this.closeButton = closeButton;
     this.historyDrawer = historyDrawer;
+    this.messageToolbar = messageToolbar;
     this.messageList = messageList;
     this.composerHint = composerHint;
     this.composerInput = composerInput;
