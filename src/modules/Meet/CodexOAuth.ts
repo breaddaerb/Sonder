@@ -130,14 +130,14 @@ async function exchangeToken(body: URLSearchParams) {
 export async function finishCodexOAuthLogin(input: string) {
   const pending = meetState.codexOAuth as { state: string; verifier: string } | undefined;
   if (!pending?.state || !pending?.verifier) {
-    throw new Error("No OAuth login is in progress. Run /login first.");
+    throw new Error("No OAuth login is in progress. Use the panel header 'Login Codex' first.");
   }
   const parsed = parseAuthorizationInput(input);
   if (!parsed.code) {
     throw new Error("Missing authorization code. Paste the full redirect URL or the code.");
   }
   if (parsed.state && parsed.state !== pending.state) {
-    throw new Error("OAuth state mismatch. Please run /login again.");
+    throw new Error("OAuth state mismatch. Start login again from panel header 'Login Codex'.");
   }
   const credentials = await exchangeToken(new URLSearchParams({
     grant_type: "authorization_code",
@@ -153,7 +153,7 @@ export async function finishCodexOAuthLogin(input: string) {
 export async function refreshCodexAccessToken() {
   const credentials = getCodexCredentials();
   if (!credentials.refresh) {
-    throw new Error("No Codex refresh token found. Run /login first.");
+    throw new Error("No Codex refresh token found. Use panel header 'Login Codex' first.");
   }
   const refreshed = await exchangeToken(new URLSearchParams({
     grant_type: "refresh_token",
@@ -166,7 +166,7 @@ export async function refreshCodexAccessToken() {
 export async function getValidCodexAccessToken() {
   let credentials = getCodexCredentials();
   if (!credentials.refresh && !credentials.access) {
-    throw new Error("No Codex credentials found. Run /provider openai-codex then /login.");
+    throw new Error("No Codex credentials found. Enable Codex provider and login from panel header.");
   }
   if (credentials.expires && Date.now() < credentials.expires - 60 * 1000 && credentials.access && credentials.accountId) {
     return credentials;

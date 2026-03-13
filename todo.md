@@ -359,7 +359,7 @@ These are not blockers for the migration baseline, but they should be cleaned up
 - [x] Remove temporary views compatibility shim and startup views binding
 - [ ] Remove/bootstrap debug marker code when no longer needed
 - [ ] Clean up leftover predecessor naming in docs/comments where appropriate
-- [ ] Decide whether old inherited assets/tags should stay in repo or move to legacy folder
+- [x] Decide whether old inherited assets/tags should stay in repo or move to legacy folder
 
 ---
 

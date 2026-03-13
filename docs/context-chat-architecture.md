@@ -14,7 +14,7 @@ These inherited parts remain the preserved baseline and should not be casually r
 - add-on packaging/output shape
 - provider selection and transport plumbing
 - Codex OAuth implementation
-- legacy modules kept only where still needed for compatibility while startup/runtime are panel-first
+- panel-first runtime without legacy popup/command module dependencies
 
 ## New rewrite tree
 
