@@ -1185,7 +1185,7 @@ export class ContextChatPanel {
     this.historyDrawer.append(meta, list);
   }
 
-  private async jumpToCitation(citation: { sourceType: "paper" | "item"; target?: string; page?: number }) {
+  private async jumpToCitation(citation: { sourceType: "paper" | "item"; target?: string; page?: number; yOffset?: number }) {
     try {
       if (citation.sourceType == "item" && citation.target?.startsWith("item:")) {
         const [, libraryStr, itemKey] = citation.target.split(":");
@@ -1211,13 +1211,14 @@ export class ContextChatPanel {
       if (!reader?._iframeWindow) {
         throw new Error("No active PDF reader is available for citation jump.");
       }
+      const yPos = citation.yOffset ?? "null";
       (reader._iframeWindow as any).wrappedJSObject.eval(`
         (() => {
           const viewer = PDFViewerApplication.pdfViewer;
           PDFViewerApplication.page = ${resolvedPage};
           viewer.scrollPageIntoView({
             pageNumber: ${resolvedPage},
-            destArray: [null, { name: "XYZ" }, 0, null, null],
+            destArray: [null, { name: "XYZ" }, 0, ${yPos}, null],
             allowNegativeOffset: false,
             ignoreDestinationZoom: false
           });

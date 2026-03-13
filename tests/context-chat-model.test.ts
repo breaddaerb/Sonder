@@ -4,6 +4,7 @@ import {
   buildItemPaperGroundedUserMessage,
   buildPaperGroundedUserMessage,
   createPaperChunkCitations,
+  parseCitedIndices,
   selectRelevantPaperChunks,
 } from "../src/context-chat/paperRetrieval";
 import { renderMessageHTML } from "../src/context-chat/render";
@@ -109,5 +110,21 @@ assert.match(renderedHTML, /sonder-math-block/);
 assert.match(renderedHTML, /<math/);
 assert.match(renderMessageHTML("plain text"), /plain text/);
 assert.equal(typeof renderMessageHTML(""), "string");
+
+// parseCitedIndices tests
+// Standalone markers: [1], [3]
+assert.deepEqual(parseCitedIndices("As shown in [1] and [3], the results...", 5), [1, 3]);
+// Grouped/comma-separated: [1, 2], [1,2,3]
+assert.deepEqual(parseCitedIndices("Evidence from [1, 2] supports this.", 5), [1, 2]);
+assert.deepEqual(parseCitedIndices("See [1,2,3] for details.", 5), [1, 2, 3]);
+assert.deepEqual(parseCitedIndices("Refs [1, 3, 5] and [2].", 5), [1, 2, 3, 5]);
+// Out-of-range indices are filtered
+assert.deepEqual(parseCitedIndices("See [0] and [6] and [3].", 5), [3]);
+// No citations
+assert.deepEqual(parseCitedIndices("No citations here.", 5), []);
+// Duplicates are deduplicated
+assert.deepEqual(parseCitedIndices("[1] and [1] again [1, 2].", 5), [1, 2]);
+// Mixed standalone and grouped
+assert.deepEqual(parseCitedIndices("[1] then [2, 4] then [3].", 5), [1, 2, 3, 4]);
 
 console.log("context-chat model tests passed");

@@ -321,14 +321,19 @@ async function requestOpenAIChat(
     );
   } catch (error: any) {
     try {
-      error = JSON.parse(error?.xmlhttp?.response).error
-      responseText = `# ${error.code}\n> ${url}\n\n**${error.type}**\n${error.message}`
-      new ztoolkit.ProgressWindow(error.code, { closeOtherProgressWindows: true })
-        .createLine({ text: error.message, type: "default" })
+      const body = error?.xmlhttp?.response || error?.xmlhttp?.responseText;
+      const raw = typeof body === "object" ? JSON.stringify(body) : String(body || "");
+      let parsed: any;
+      try { parsed = JSON.parse(raw); } catch { parsed = {}; }
+      const err = parsed?.error || parsed;
+      responseText = `# ${err.code || "Error"}\n> ${url}\n\n**${err.type || "request_error"}**\n${err.message || raw || error?.message || "Unknown error"}`
+      new ztoolkit.ProgressWindow(err.code || "Error", { closeOtherProgressWindows: true })
+        .createLine({ text: err.message || "Request failed.", type: "default" })
         .show()
     } catch {
+      responseText = `# Error\n> ${url}\n\n${error?.message || "Unknown error"}`
       new ztoolkit.ProgressWindow("Error", { closeOtherProgressWindows: true })
-        .createLine({ text: error.message, type: "default" })
+        .createLine({ text: error?.message || "Unknown error", type: "default" })
         .show()
     }
   }
@@ -564,8 +569,6 @@ export async function testCustomApiConnection(
         body: JSON.stringify({
           model,
           messages: [{ role: "user", content: "hi" }],
-          max_tokens: 1,
-          stream: false,
         }),
         responseType: "json",
         timeout: 15000,

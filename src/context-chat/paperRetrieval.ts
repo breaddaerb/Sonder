@@ -6,6 +6,10 @@ export interface PaperChunk {
   page: number;
   label: string;
   content: string;
+  /** Y-coordinate of the first text line in this chunk (PDF coordinate system, origin bottom-left). */
+  topY?: number;
+  /** Y-coordinate of the last text line in this chunk (PDF coordinate system, origin bottom-left). */
+  bottomY?: number;
 }
 
 export interface PreparedPaperContext {
@@ -99,6 +103,84 @@ function chunkText(pageText: string, page: number, maxChars: number = 1800) {
   return chunks;
 }
 
+/** A text line with its y-coordinate from PDF text extraction. */
+interface PositionedLine {
+  text: string;
+  y: number;
+}
+
+/**
+ * Build chunks from lines that carry y-coordinates, so each chunk records
+ * the y-position of its first contributing line.
+ * This enables fine-grained scroll-to-position when clicking citation chips.
+ */
+function chunkLinesWithPosition(lines: PositionedLine[], page: number, maxChars: number = 1800): PaperChunk[] {
+  if (lines.length === 0) {
+    return [];
+  }
+
+  const chunks: PaperChunk[] = [];
+  let buffer = "";
+  let bufferFirstY: number | undefined;
+  let bufferLastY: number | undefined;
+  let chunkIndex = 0;
+
+  const pushBuffer = () => {
+    const content = normalizeText(buffer);
+    if (!content) {
+      buffer = "";
+      bufferFirstY = undefined;
+      bufferLastY = undefined;
+      return;
+    }
+    chunkIndex += 1;
+    chunks.push({
+      id: `p${page}-c${chunkIndex}`,
+      page,
+      label: `p.${page}`,
+      content,
+      topY: bufferFirstY,
+      bottomY: bufferLastY,
+    });
+    buffer = "";
+    bufferFirstY = undefined;
+    bufferLastY = undefined;
+  };
+
+  lines.forEach((line) => {
+    const text = normalizeText(line.text);
+    if (!text) {
+      return;
+    }
+
+    if ((buffer + " " + text).trim().length > maxChars) {
+      if (buffer) {
+        pushBuffer();
+      }
+      // If a single line exceeds maxChars, split it into sub-chunks
+      if (text.length > maxChars) {
+        for (let offset = 0; offset < text.length; offset += maxChars) {
+          buffer = text.slice(offset, offset + maxChars);
+          if (bufferFirstY === undefined) {
+            bufferFirstY = line.y;
+          }
+          bufferLastY = line.y;
+          pushBuffer();
+        }
+        return;
+      }
+    }
+
+    if (bufferFirstY === undefined) {
+      bufferFirstY = line.y;
+    }
+    bufferLastY = line.y;
+    buffer = (buffer ? `${buffer} ${text}` : text).trim();
+  });
+  pushBuffer();
+  return chunks;
+}
+
 function fallbackQueryTokens(queryText: string) {
   const tokens = (queryText.toLowerCase().match(/[a-z0-9]{2,}|[\u4e00-\u9fff]{1,8}/g) || [])
     .map((token) => token.trim())
@@ -131,15 +213,53 @@ export function selectRelevantPaperChunks(queryText: string, chunks: PaperChunk[
     .sort((a, b) => a.page - b.page || a.id.localeCompare(b.id));
 }
 
-export function createPaperChunkCitations(chunks: PaperChunk[]): Citation[] {
-  return chunks.map((chunk, index) => ({
-    id: chunk.id,
-    label: `[${index + 1}] ${chunk.label}`,
-    sourceType: "paper",
-    target: `page:${chunk.page}`,
-    page: chunk.page,
-    preview: chunk.content.slice(0, 220),
-  }));
+/**
+ * Parse citation markers from model response text.
+ * Supports standalone markers like [1], [2] as well as grouped/comma-separated
+ * forms like [1, 2], [1,2,3], [1, 3, 5].
+ * Returns a sorted array of unique 1-based indices that fall within the valid range.
+ */
+export function parseCitedIndices(responseText: string, maxIndex: number): number[] {
+  const cited = new Set<number>();
+  // Match bracket groups that contain digits and commas/spaces, e.g. [1], [1, 2], [1,2,3]
+  const bracketPattern = /\[([\d,\s]+)\]/g;
+  let match: RegExpExecArray | null;
+  while ((match = bracketPattern.exec(responseText)) !== null) {
+    const inner = match[1];
+    // Extract all numbers from within the bracket group
+    const numbers = inner.match(/\d+/g);
+    if (numbers) {
+      for (const numStr of numbers) {
+        const index = Number(numStr);
+        if (index >= 1 && index <= maxIndex) {
+          cited.add(index);
+        }
+      }
+    }
+  }
+  return [...cited].sort((a, b) => a - b);
+}
+
+/**
+ * Create citation objects from paper chunks.
+ * If `originalIndices` is provided, each entry is the original 1-based index
+ * used in the model's response text, so the chip label matches the citation marker.
+ * If not provided, sequential 1-based labels are used.
+ */
+export function createPaperChunkCitations(chunks: PaperChunk[], originalIndices?: number[]): Citation[] {
+  return chunks.map((chunk, i) => {
+    const displayIndex = originalIndices ? originalIndices[i] : i + 1;
+    return {
+      id: chunk.id,
+      label: `[${displayIndex}] ${chunk.label}`,
+      sourceType: "paper" as const,
+      target: `page:${chunk.page}`,
+      page: chunk.page,
+      yOffset: chunk.topY,
+      yOffsetBottom: chunk.bottomY,
+      preview: chunk.content.slice(0, 220),
+    };
+  });
 }
 
 export function buildPaperGroundedUserMessage(args: {
@@ -389,8 +509,14 @@ async function readPdfChunks(
     const textContent = await pdfPage.getTextContent();
     const items = (textContent.items as PDFItem[]).filter((item) => item.str?.trim().length);
     const lines = mergeSameLine(items);
-    const pageText = lines.map((line) => line.text).join("\n");
-    chunks.push(...chunkText(pageText, pageIndex + 1));
+
+    // Build positioned lines for fine-grained chunk y-coordinates.
+    // PDFLine.y is in PDF coordinate space (origin bottom-left, y increases upward).
+    const positionedLines: PositionedLine[] = lines.map((line) => ({
+      text: line.text,
+      y: line.y,
+    }));
+    chunks.push(...chunkLinesWithPosition(positionedLines, pageIndex + 1));
   }
 
   return {
