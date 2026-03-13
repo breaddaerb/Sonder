@@ -149,7 +149,7 @@ Main direction: large right-side docked chat panel.
 - [x] Decide where/how the panel mounts inside Zotero UI
 - [x] Confirm panel can coexist with Zotero layout without breaking usability
 - [x] Support panel open/close lifecycle safely
-- [ ] Polish launcher button vertical text alignment/centering
+- [x] Polish launcher button vertical text alignment/centering
 
 ### 6.2 Header
 - [x] Show context badge

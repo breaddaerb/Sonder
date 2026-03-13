@@ -137,6 +137,10 @@ export class ContextChatPanel {
         padding: 10px 16px;
         font-size: 13px;
         font-weight: 600;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         cursor: pointer;
         box-shadow: 0 12px 28px rgba(31, 111, 235, 0.28);
       }
