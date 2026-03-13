@@ -149,6 +149,7 @@ Main direction: large right-side docked chat panel.
 - [x] Decide where/how the panel mounts inside Zotero UI
 - [x] Confirm panel can coexist with Zotero layout without breaking usability
 - [x] Support panel open/close lifecycle safely
+- [ ] Polish launcher button vertical text alignment/centering
 
 ### 6.2 Header
 - [x] Show context badge
@@ -167,12 +168,18 @@ Main direction: large right-side docked chat panel.
   - [x] preparing
   - [x] ready
   - [x] failed
+- [ ] Reorganize header actions into clear groups
+  - [ ] Session group: `History` / `New Session` / `Clear Session`
+  - [ ] Provider/Auth group: provider + `Login/Logout` actions
+  - [ ] Panel controls group: `Close` isolated at far edge
+- [ ] Reposition `Raw Markdown` / `Preview` control closer to message-level copy workflow
 
 ### 6.3 Message area
 - [x] Large scrollable message list
 - [x] User / assistant message separation
 - [x] Message text must be selectable/copyable in panel output
 - [x] Add one-click copy button for assistant messages (copy raw markdown)
+- [x] Ensure partial text selection can be copied with normal system copy shortcut/context menu
 - [x] Markdown rendering
   - [x] Improve code-block readability in panel output
   - [x] Keep rendered output easy to copy/paste into Notion

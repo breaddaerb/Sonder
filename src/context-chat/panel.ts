@@ -28,6 +28,23 @@ const PANEL_WIDTH_STORAGE_KEY = "sonder.contextChat.panelWidth";
 
 export class ContextChatPanel {
   private launcherButton!: HTMLButtonElement;
+  private readonly onCopyShortcut = (event: KeyboardEvent) => {
+    const isCopyKey = (event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() == "c";
+    if (!isCopyKey) {
+      return;
+    }
+    const selection = this.ownerWindow.getSelection();
+    const selectedText = selection?.toString() || "";
+    if (!selectedText.trim()) {
+      return;
+    }
+    const anchor = selection?.anchorNode;
+    if (!anchor || !this.panel?.contains(anchor)) {
+      return;
+    }
+    event.preventDefault();
+    void this.copySelectedText(selectedText);
+  };
   private panel!: HTMLDivElement;
   private resizeHandle!: HTMLDivElement;
   private badge!: HTMLSpanElement;
@@ -89,6 +106,7 @@ export class ContextChatPanel {
     }
     this.buildLauncher();
     this.buildPanel();
+    this.ownerWindow.addEventListener("keydown", this.onCopyShortcut, true);
     this.render();
   }
 
@@ -97,6 +115,7 @@ export class ContextChatPanel {
   }
 
   public destroy() {
+    this.ownerWindow.removeEventListener("keydown", this.onCopyShortcut, true);
     this.launcherButton?.remove();
     this.panel?.remove();
     this.ownerWindow.document.getElementById("sonder-context-chat-style")?.remove();
@@ -1224,6 +1243,18 @@ export class ContextChatPanel {
           });
         })()
       `);
+    } catch (error: any) {
+      Zotero.logError(error);
+    }
+  }
+
+  private async copySelectedText(text: string) {
+    try {
+      if (this.ownerWindow.navigator?.clipboard?.writeText) {
+        await this.ownerWindow.navigator.clipboard.writeText(text);
+      } else {
+        new ztoolkit.Clipboard().addText(text, "text/unicode").copy();
+      }
     } catch (error: any) {
       Zotero.logError(error);
     }
