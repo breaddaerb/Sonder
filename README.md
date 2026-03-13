@@ -1,5 +1,4 @@
-<div align="center">
-  <img src="imgs/background.png" width="42%" />
+<div align="center"> 
 
 # Sonder
 
@@ -65,17 +64,6 @@ Open Zotero:
 - `Tools -> Add-ons`
 - gear icon -> `Install Add-on From File...`
 - select `builds/sonder.xpi`
-
-## Current provider commands
-
-The migrated baseline keeps limited legacy command compatibility, but the primary runtime UX is now the context chat panel.
-Useful commands in the current baseline include:
-
-```text
-/provider openai-codex
-/login
-/report
-```
 
 ## Provider modes
 
