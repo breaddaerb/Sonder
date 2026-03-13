@@ -68,7 +68,7 @@ Open Zotero:
 
 ## Current provider commands
 
-The current migrated baseline still includes the legacy command-driven interface while the new UX is being designed.
+The migrated baseline keeps limited legacy command compatibility, but the primary runtime UX is now the context chat panel.
 Useful commands in the current baseline include:
 
 ```text
@@ -108,7 +108,7 @@ This works with any provider that exposes an OpenAI-compatible `/chat/completion
 
 ## Experimental paper chat panel
 
-The rewrite now includes an experimental paper-chat panel alongside the preserved legacy popup UI.
+The rewrite now includes an experimental paper-chat panel as the primary UI surface.
 
 Current behavior:
 
@@ -150,7 +150,7 @@ Current limitation:
 - math preview quality depends on the model emitting explicit math delimiters consistently, though the panel now nudges it toward `$...$` / `$$...$$`
 - retrieval is currently a simple chunked lexical-ranking implementation, not the final retrieval stack yet
 - item+paper mode always injects selected item text; paper retrieval still depends on available PDF preparation context
-- the legacy shortcut/command UI remains available as a fallback while the rewrite continues
+- legacy command compatibility remains available where still referenced, while runtime UX is panel-first
 
 ## Tests
 

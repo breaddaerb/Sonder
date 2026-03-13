@@ -1,5 +1,5 @@
 import { config } from "../../../package.json";
-import Views from "../views";
+import { LegacyViewsCompat } from "../LegacyViewsShim";
 import Meet from "./api";
 
 /**
@@ -73,7 +73,7 @@ export function insertEditorText(htmlString: string, editor?: any) {
  * 让GPT UI跟随此行
  */
 export function follow() {
-  const views = Zotero[config.addonInstance].views as Views
+  const views = Zotero[config.addonInstance].views as LegacyViewsCompat
   const BNEditorApi = Zotero.BetterNotes.api.editor
   const editor = BNEditorApi.getEditorInstance(Zotero.BetterNotes.data.workspace.mainId);
   let getLine: any = (index: number) => {

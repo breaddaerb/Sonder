@@ -337,9 +337,9 @@ This is important because one major product requirement is explaining paper form
 Command tags are no longer the main product surface.
 
 ### V1 plan
-- [ ] Keep legacy command-tag system available only if cheap/safe
-- [ ] Remove command tags from primary UX path
-- [ ] Ensure new paper/item chat flows do not require understanding tags
+- [x] Keep legacy command-tag system available only if cheap/safe
+- [x] Remove command tags from primary UX path
+- [x] Ensure new paper/item chat flows do not require understanding tags
 
 ### Later cleanup
 - [ ] Decide whether tags remain as advanced mode or move to separate legacy section
@@ -353,6 +353,7 @@ These are not blockers for the migration baseline, but they should be cleaned up
 - [ ] Investigate inherited non-fatal toolkit warning:
   - [ ] `TypeError: this.getGlobal(...).get(...) is not a constructor`
 - [x] Remove temporary development auto-open hack once new panel entry exists
+- [x] Remove legacy popup runtime module (`src/modules/views.ts`) after panel fallback was stabilized
 - [ ] Remove/bootstrap debug marker code when no longer needed
 - [ ] Clean up leftover predecessor naming in docs/comments where appropriate
 - [ ] Decide whether old inherited assets/tags should stay in repo or move to legacy folder
@@ -429,7 +430,7 @@ Sonder V1 should satisfy all of these:
 
 ### UX
 - [ ] main flow does not depend on command tags
-- [ ] main flow does not depend on shortcuts
+- [x] main flow does not depend on shortcuts
 - [ ] user always knows current context
 
 ---

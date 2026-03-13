@@ -17,13 +17,13 @@ import {
 import {
   getGPTResponse
 } from "./OpenAI"
-import Views from "../views";
+import { LegacyViewsCompat } from "../LegacyViewsShim";
 
 const Meet: {
   [key: string]: any;
   Global: {
     [key: string]: any;
-    views: Views | undefined
+    views: LegacyViewsCompat | undefined
   }
 } = {
   /**
