@@ -51,6 +51,7 @@ The inherited legacy surface has been narrowed and no longer drives startup runt
 
 - popup runtime module `src/modules/views.ts` has been removed
 - startup binds `Zotero[addon].views` to a lightweight compatibility shim
+- legacy views-coupled OpenAI helper paths are removed from active runtime usage
 - command-tag and popup-first paths are removed from primary runtime and replaced by panel/menu UX
 
 This keeps plugin loadability stable while removing dependence on the legacy popup architecture.

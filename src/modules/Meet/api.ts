@@ -14,9 +14,6 @@ import {
   reFocus
 } from "./BetterNotes"
 
-import {
-  getGPTResponse
-} from "./OpenAI"
 import { LegacyViewsCompat } from "../LegacyViewsShim";
 
 const Meet: {
@@ -70,9 +67,6 @@ const Meet: {
     replaceEditorText,
     follow,
     reFocus
-  },
-  OpenAI: {
-    getGPTResponse
   },
   Global: {
     lock: undefined,
