@@ -214,17 +214,27 @@ export function selectRelevantPaperChunks(queryText: string, chunks: PaperChunk[
 }
 
 /**
- * Parse citation markers like [1], [2], [3] from model response text.
+ * Parse citation markers from model response text.
+ * Supports standalone markers like [1], [2] as well as grouped/comma-separated
+ * forms like [1, 2], [1,2,3], [1, 3, 5].
  * Returns a sorted array of unique 1-based indices that fall within the valid range.
  */
 export function parseCitedIndices(responseText: string, maxIndex: number): number[] {
   const cited = new Set<number>();
-  const pattern = /\[(\d+)\]/g;
+  // Match bracket groups that contain digits and commas/spaces, e.g. [1], [1, 2], [1,2,3]
+  const bracketPattern = /\[([\d,\s]+)\]/g;
   let match: RegExpExecArray | null;
-  while ((match = pattern.exec(responseText)) !== null) {
-    const index = Number(match[1]);
-    if (index >= 1 && index <= maxIndex) {
-      cited.add(index);
+  while ((match = bracketPattern.exec(responseText)) !== null) {
+    const inner = match[1];
+    // Extract all numbers from within the bracket group
+    const numbers = inner.match(/\d+/g);
+    if (numbers) {
+      for (const numStr of numbers) {
+        const index = Number(numStr);
+        if (index >= 1 && index <= maxIndex) {
+          cited.add(index);
+        }
+      }
     }
   }
   return [...cited].sort((a, b) => a - b);
