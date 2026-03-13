@@ -56,10 +56,8 @@ export class ContextChatPanel {
   private clearSessionButton!: HTMLButtonElement;
   private codexAuthButton!: HTMLButtonElement;
   private customApiButton!: HTMLButtonElement;
-  private viewModeButton!: HTMLButtonElement;
   private closeButton!: HTMLButtonElement;
   private historyDrawer!: HTMLDivElement;
-  private messageToolbar!: HTMLDivElement;
   private messageList!: HTMLDivElement;
   private composerHint!: HTMLDivElement;
   private composerInput!: HTMLTextAreaElement;
@@ -189,6 +187,7 @@ export class ContextChatPanel {
         background: rgba(59, 130, 246, 0.35);
       }
       #sonder-context-chat-panel .sonder-panel-header {
+        position: relative;
         padding: 18px 20px 16px;
         border-bottom: 1px solid #e5e7eb;
         display: flex;
@@ -201,6 +200,7 @@ export class ContextChatPanel {
         align-items: flex-start;
         justify-content: space-between;
         gap: 12px;
+        padding-left: 34px;
       }
       #sonder-context-chat-panel .sonder-context-badge {
         display: inline-flex;
@@ -272,10 +272,19 @@ export class ContextChatPanel {
         padding: 8px 12px;
         font-size: 12px;
         font-weight: 600;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         cursor: pointer;
       }
       #sonder-context-chat-panel .sonder-close {
-        padding: 8px 10px;
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        padding: 6px 8px;
+        min-width: 28px;
+        z-index: 3;
       }
       #sonder-context-chat-panel .sonder-action:hover,
       #sonder-context-chat-panel .sonder-close:hover,
@@ -338,18 +347,10 @@ export class ContextChatPanel {
         font-size: 12px;
         color: #64748b;
       }
-      #sonder-context-chat-panel .sonder-message-toolbar {
-        display: flex;
-        justify-content: flex-end;
-        align-items: center;
-        gap: 8px;
-        padding: 10px 20px 0;
-        background: #f8fafc;
-      }
       #sonder-context-chat-panel .sonder-message-list {
         flex: 1;
         overflow: auto;
-        padding: 12px 20px 20px;
+        padding: 20px;
         background: #f8fafc;
         -moz-user-select: text;
         user-select: text;
@@ -403,20 +404,32 @@ export class ContextChatPanel {
       #sonder-context-chat-panel .sonder-message-footer {
         display: flex;
         justify-content: flex-end;
+        align-items: center;
+        gap: 8px;
         margin-top: 8px;
       }
-      #sonder-context-chat-panel .sonder-copy-button {
+      #sonder-context-chat-panel .sonder-icon-button {
         border: 1px solid #dbe2ea;
         background: #fff;
         color: #334155;
         border-radius: 8px;
-        padding: 4px 8px;
-        font-size: 11px;
-        font-weight: 600;
+        width: 28px;
+        height: 28px;
+        font-size: 13px;
+        line-height: 1;
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         cursor: pointer;
       }
-      #sonder-context-chat-panel .sonder-copy-button:hover {
+      #sonder-context-chat-panel .sonder-icon-button:hover {
         background: #f8fafc;
+      }
+      #sonder-context-chat-panel .sonder-icon-button.is-active {
+        background: rgba(29, 78, 216, 0.08);
+        border-color: #93c5fd;
+        color: #1d4ed8;
       }
       #sonder-context-chat-panel .sonder-message-content {
         font-size: 14px;
@@ -707,30 +720,20 @@ export class ContextChatPanel {
 
     const closeButton = createHTML(doc, "button");
     closeButton.className = "sonder-close";
-    closeButton.textContent = "Close";
+    closeButton.textContent = "❯";
+    closeButton.title = "Fold panel";
     closeButton.addEventListener("click", () => {
       this.state.visible = false;
       this.state.historyOpen = false;
       this.render();
     });
 
-    actionRow.append(sessionGroup, providerGroup, spacer, closeButton);
+    actionRow.append(sessionGroup, providerGroup, spacer);
 
     const historyDrawer = createHTML(doc, "div");
     historyDrawer.className = "sonder-history-drawer";
 
-    header.append(topRow, actionRow, historyDrawer);
-
-    const messageToolbar = createHTML(doc, "div");
-    messageToolbar.className = "sonder-message-toolbar";
-
-    const viewModeButton = createHTML(doc, "button");
-    viewModeButton.className = "sonder-action";
-    viewModeButton.addEventListener("click", () => {
-      this.state.viewMode = this.state.viewMode == "raw" ? "preview" : "raw";
-      this.render();
-    });
-    messageToolbar.appendChild(viewModeButton);
+    header.append(closeButton, topRow, actionRow, historyDrawer);
 
     const messageList = createHTML(doc, "div");
     messageList.className = "sonder-message-list";
@@ -771,7 +774,7 @@ export class ContextChatPanel {
     composerActions.append(composerNote, sendButton);
     composer.append(composerHint, composerInput, composerActions);
 
-    panel.append(resizeHandle, header, messageToolbar, messageList, composer);
+    panel.append(resizeHandle, header, messageList, composer);
     doc.documentElement.appendChild(panel);
 
     this.panel = panel;
@@ -786,10 +789,8 @@ export class ContextChatPanel {
     this.clearSessionButton = clearSessionButton;
     this.codexAuthButton = codexAuthButton;
     this.customApiButton = customApiButton;
-    this.viewModeButton = viewModeButton;
     this.closeButton = closeButton;
     this.historyDrawer = historyDrawer;
-    this.messageToolbar = messageToolbar;
     this.messageList = messageList;
     this.composerHint = composerHint;
     this.composerInput = composerInput;
@@ -1308,7 +1309,7 @@ export class ContextChatPanel {
         new ztoolkit.Clipboard().addText(rawText, "text/unicode").copy();
       }
       const previous = button.textContent;
-      button.textContent = "Copied";
+      button.textContent = "✓";
       this.ownerWindow.setTimeout(() => {
         button.textContent = previous;
       }, 1200);
@@ -1459,15 +1460,32 @@ export class ContextChatPanel {
       if (message.role == "assistant" && message.id != "assistant-preview") {
         const footer = createHTML(doc, "div");
         footer.className = "sonder-message-footer";
+
+        const viewToggleButton = createHTML(doc, "button");
+        viewToggleButton.className = "sonder-icon-button";
+        viewToggleButton.textContent = this.state.viewMode == "raw" ? "👁" : "📝";
+        viewToggleButton.title = this.state.viewMode == "raw"
+          ? "Switch to Preview"
+          : "Switch to Raw Markdown";
+        viewToggleButton.classList.toggle("is-active", this.state.viewMode == "preview");
+        viewToggleButton.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          this.state.viewMode = this.state.viewMode == "raw" ? "preview" : "raw";
+          this.render();
+        });
+
         const copyButton = createHTML(doc, "button");
-        copyButton.className = "sonder-copy-button";
-        copyButton.textContent = "Copy MD";
+        copyButton.className = "sonder-icon-button";
+        copyButton.textContent = "⧉";
+        copyButton.title = "Copy raw markdown";
         copyButton.addEventListener("click", (event) => {
           event.preventDefault();
           event.stopPropagation();
           void this.copyMessageContent(message.content, copyButton);
         });
-        footer.appendChild(copyButton);
+
+        footer.append(viewToggleButton, copyButton);
         node.appendChild(footer);
       }
 
@@ -1610,12 +1628,6 @@ export class ContextChatPanel {
       : "Configure a custom OpenAI-compatible API endpoint (base URL + API key + model)";
     this.customApiButton.classList.toggle("is-active", provider == "openai-api" && hasCustomApiConfig());
 
-    this.viewModeButton.disabled = false;
-    this.viewModeButton.textContent = this.state.viewMode == "raw" ? "Preview" : "Raw Markdown";
-    this.viewModeButton.title = this.state.viewMode == "raw"
-      ? "Render assistant markdown for preview"
-      : "Show the raw markdown source for assistant messages";
-    this.viewModeButton.classList.toggle("is-active", this.state.viewMode == "preview");
     this.closeButton.disabled = false;
 
     this.renderHistory();
