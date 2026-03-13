@@ -2,7 +2,7 @@ import { config } from "../../../package.json";
 import { MD5 } from "crypto-js"
 import { Document } from "langchain/document";
 import LocalStorage from "../localStorage";
-import Meet from "./api";
+import meetState from "./state";
 import { getValidCodexAccessToken } from "./CodexOAuth";
 import { getCurrentModel, getProvider, supportsEmbeddings } from "../provider";
 const similarity = require('compute-cosine-similarity');
@@ -135,7 +135,7 @@ function formatCodexError(error: any) {
  * @returns
  */
 export async function similaritySearch(queryText: string, docs: Document[], obj: { key: string }) {
-  const storage = Meet.Global.storage = Meet.Global.storage || new LocalStorage(config.addonRef)
+  const storage = meetState.storage = meetState.storage || new LocalStorage(config.addonRef)
   await storage.lock.promise;
   const embeddings = new OpenAIEmbeddings() as any
   const id = MD5(docs.map((i: any) => i.pageContent).join("\n\n")).toString()
@@ -144,10 +144,10 @@ export async function similaritySearch(queryText: string, docs: Document[], obj:
   ztoolkit.log(_vv)
   let vv: any
   if (_vv) {
-    Meet.Global.popupWin.createLine({ text: "Reading embeddings...", type: "default" })
+    meetState.popupWin?.createLine({ text: "Reading embeddings...", type: "default" })
     vv = _vv
   } else {
-    Meet.Global.popupWin.createLine({ text: "Generating embeddings...", type: "default" })
+    meetState.popupWin?.createLine({ text: "Generating embeddings...", type: "default" })
     vv = await embeddings.embedDocuments(docs.map((i: any) => i.pageContent))
     window.setTimeout(async () => {
       await storage.set(obj, id, vv)
@@ -156,7 +156,7 @@ export async function similaritySearch(queryText: string, docs: Document[], obj:
 
   const v0 = await embeddings.embedQuery(queryText)
   const relatedNumber = Zotero.Prefs.get(`${config.addonRef}.relatedNumber`) as number
-  Meet.Global.popupWin.createLine({ text: `Searching ${relatedNumber} related content...`, type: "default" })
+  meetState.popupWin?.createLine({ text: `Searching ${relatedNumber} related content...`, type: "default" })
   const k = relatedNumber * 5
   const pp = vv.map((v: any) => similarity(v0, v));
   docs = [...pp].sort((a, b) => b - a).slice(0, k).map((p: number) => {

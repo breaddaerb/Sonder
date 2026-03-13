@@ -138,7 +138,7 @@ Current limitation:
 - math preview quality depends on the model emitting explicit math delimiters consistently, though the panel now nudges it toward `$...$` / `$$...$$`
 - retrieval is currently a simple chunked lexical-ranking implementation, not the final retrieval stack yet
 - item+paper mode always injects selected item text; paper retrieval still depends on available PDF preparation context
-- legacy command compatibility remains available where still referenced, while runtime UX is panel-first
+- runtime UX is fully panel-first; legacy popup/command-tag runtime paths have been removed
 
 ## Tests
 

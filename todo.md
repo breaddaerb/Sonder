@@ -396,7 +396,7 @@ Recommended sequence for happy coding:
 ### Phase 6: polish
 - [ ] citations/source jumps
 - [ ] formula rendering
-- [ ] legacy tag de-emphasis
+- [x] legacy tag de-emphasis
 - [ ] cleanup inherited warnings/hacks
 
 ---
@@ -432,7 +432,7 @@ Sonder V1 should satisfy all of these:
 - [ ] switch among sessions for same context
 
 ### UX
-- [ ] main flow does not depend on command tags
+- [x] main flow does not depend on command tags
 - [x] main flow does not depend on shortcuts
 - [ ] user always knows current context
 

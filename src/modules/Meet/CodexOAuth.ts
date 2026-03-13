@@ -1,4 +1,4 @@
-import Meet from "./api";
+import meetState from "./state";
 import { clearCodexCredentials, getCodexCredentials, setCodexCredentials } from "../provider";
 
 const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
@@ -62,7 +62,7 @@ export async function startCodexOAuthLogin(originator: string = "sonder") {
   url.searchParams.set("id_token_add_organizations", "true");
   url.searchParams.set("codex_cli_simplified_flow", "true");
   url.searchParams.set("originator", originator);
-  Meet.Global.codexOAuth = { state, verifier };
+  meetState.codexOAuth = { state, verifier };
   return {
     url: url.toString(),
     state,
@@ -128,7 +128,7 @@ async function exchangeToken(body: URLSearchParams) {
 }
 
 export async function finishCodexOAuthLogin(input: string) {
-  const pending = Meet.Global.codexOAuth as { state: string; verifier: string } | undefined;
+  const pending = meetState.codexOAuth as { state: string; verifier: string } | undefined;
   if (!pending?.state || !pending?.verifier) {
     throw new Error("No OAuth login is in progress. Run /login first.");
   }
@@ -146,7 +146,7 @@ export async function finishCodexOAuthLogin(input: string) {
     code_verifier: pending.verifier,
     redirect_uri: REDIRECT_URI,
   }));
-  Meet.Global.codexOAuth = undefined;
+  meetState.codexOAuth = undefined;
   return credentials;
 }
 
@@ -176,7 +176,7 @@ export async function getValidCodexAccessToken() {
 }
 
 export function clearCodexLogin() {
-  Meet.Global.codexOAuth = undefined;
+  meetState.codexOAuth = undefined;
   clearCodexCredentials();
 }
 
@@ -184,6 +184,6 @@ export function getCodexLoginReport() {
   const credentials = getCodexCredentials();
   return {
     ...credentials,
-    hasPendingLogin: Boolean(Meet.Global.codexOAuth?.state),
+    hasPendingLogin: Boolean(meetState.codexOAuth?.state),
   };
 }
