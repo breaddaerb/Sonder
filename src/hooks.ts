@@ -1,8 +1,6 @@
 import { config } from "../package.json";
 import ContextChatFeature from "./context-chat";
 import { initLocale } from "./modules/locale";
-import Meet from "./modules/Meet/api";
-import LegacyViewsShim from "./modules/LegacyViewsShim";
 import Utils from "./modules/utils";
 
 async function onStartup() {
@@ -21,9 +19,6 @@ async function onStartup() {
     `chrome://${config.addonRef}/content/icons/favicon.png`
   );
 
-  const legacyViewsShim = new LegacyViewsShim();
-  Zotero[config.addonInstance].views = legacyViewsShim;
-  Meet.Global.views = legacyViewsShim as any;
   Zotero[config.addonInstance].utils = new Utils();
 
   const contextChat = new ContextChatFeature();

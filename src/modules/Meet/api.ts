@@ -10,17 +10,13 @@ import {
   getEditorText,
   insertEditorText,
   replaceEditorText,
-  follow,
   reFocus
 } from "./BetterNotes"
-
-import { LegacyViewsCompat } from "../LegacyViewsShim";
 
 const Meet: {
   [key: string]: any;
   Global: {
     [key: string]: any;
-    views: LegacyViewsCompat | undefined
   }
 } = {
   /**
@@ -65,13 +61,11 @@ const Meet: {
     getEditorText,
     insertEditorText,
     replaceEditorText,
-    follow,
     reFocus
   },
   Global: {
     lock: undefined,
     input: undefined,
-    views: undefined,
     popupWin: undefined,
     storage: undefined,
     codexOAuth: undefined

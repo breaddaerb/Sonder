@@ -445,7 +445,6 @@ export async function getRelatedText(queryText: string) {
     docs = fallbackRelatedDocs(queryText, docs)
   }
   ztoolkit.log("docs", docs)
-  Zotero[config.addonInstance].views.insertAuxiliary(docs)
   return docs.map((doc: Document, index: number) => `[${index + 1}]${doc.pageContent}`).join("\n\n")
 }
 
@@ -502,6 +501,5 @@ export async function getPDFAnnotations(select: boolean = false) {
       })
     )
   })
-  Zotero[config.addonInstance].views.insertAuxiliary(docs)
   return docs.map((doc: Document, index: number) => `[${index + 1}]${doc.pageContent}`).join("\n\n")
 }

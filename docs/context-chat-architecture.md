@@ -14,7 +14,7 @@ These inherited parts remain the preserved baseline and should not be casually r
 - add-on packaging/output shape
 - provider selection and transport plumbing
 - Codex OAuth implementation
-- legacy modules kept for compatibility, with startup now using a lightweight views shim instead of popup-first runtime
+- legacy modules kept only where still needed for compatibility while startup/runtime are panel-first
 
 ## New rewrite tree
 
@@ -50,8 +50,8 @@ Current rewrite modules:
 The inherited legacy surface has been narrowed and no longer drives startup runtime:
 
 - popup runtime module `src/modules/views.ts` has been removed
-- startup binds `Zotero[addon].views` to a lightweight compatibility shim
 - legacy views-coupled OpenAI helper paths are removed from active runtime usage
+- startup no longer binds any `views` runtime object
 - command-tag and popup-first paths are removed from primary runtime and replaced by panel/menu UX
 
 This keeps plugin loadability stable while removing dependence on the legacy popup architecture.

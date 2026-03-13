@@ -356,6 +356,7 @@ These are not blockers for the migration baseline, but they should be cleaned up
 - [x] Remove legacy popup runtime module (`src/modules/views.ts`) after panel fallback was stabilized
 - [x] Remove legacy command-tag module (`src/modules/base.ts`) from active codebase
 - [x] Remove legacy views-coupled OpenAI helper flow (`getGPTResponse*`) from active codebase
+- [x] Remove temporary views compatibility shim and startup views binding
 - [ ] Remove/bootstrap debug marker code when no longer needed
 - [ ] Clean up leftover predecessor naming in docs/comments where appropriate
 - [ ] Decide whether old inherited assets/tags should stay in repo or move to legacy folder
