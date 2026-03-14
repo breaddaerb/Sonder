@@ -28,6 +28,8 @@ function formatTimestamp(timestamp: number) {
 const PANEL_WIDTH_STORAGE_KEY = "sonder.contextChat.panelWidth";
 
 export class ContextChatPanel {
+  private insightRefreshSerial = 0;
+
   private readonly onCopyShortcut = (event: KeyboardEvent) => {
     const isCopyKey = (event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() == "c";
     if (!isCopyKey) {
@@ -1410,28 +1412,42 @@ export class ContextChatPanel {
   }
 
   private async refreshInsightsForCurrentContext() {
+    const refreshSerial = ++this.insightRefreshSerial;
     const context = this.state.snapshot?.context;
     if (!context) {
       this.state.insights = [];
       this.state.insightsLoading = false;
+      this.render();
       return;
     }
 
+    const contextId = context.id;
     const { itemKey, libraryID } = this.getInsightScopeForContext(context);
     if (!itemKey) {
       this.state.insights = [];
       this.state.insightsLoading = false;
+      this.render();
       return;
     }
 
     this.state.insightsLoading = true;
     this.render();
     try {
-      this.state.insights = await this.store.listInsightsByItemKey(itemKey, libraryID);
+      const insights = await this.store.listInsightsByItemKey(itemKey, libraryID);
+      if (refreshSerial != this.insightRefreshSerial || this.state.snapshot?.context.id != contextId) {
+        return;
+      }
+      this.state.insights = insights;
     } catch (error: any) {
       Zotero.logError(error);
+      if (refreshSerial != this.insightRefreshSerial || this.state.snapshot?.context.id != contextId) {
+        return;
+      }
       this.state.insights = [];
     } finally {
+      if (refreshSerial != this.insightRefreshSerial || this.state.snapshot?.context.id != contextId) {
+        return;
+      }
       this.state.insightsLoading = false;
       this.render();
     }
@@ -1440,6 +1456,12 @@ export class ContextChatPanel {
   private async saveInsightFromMessage(message: StoredMessage, button: HTMLButtonElement) {
     const snapshot = this.state.snapshot;
     if (!snapshot) {
+      return;
+    }
+
+    const existingInsightId = this.state.savedInsightsByMessage[message.id];
+    if (existingInsightId) {
+      this.ownerWindow.alert(`Already saved as ${existingInsightId}`);
       return;
     }
 
@@ -1460,7 +1482,13 @@ export class ContextChatPanel {
         content: message.content,
       });
 
-      await appendInsightMarkerForContext(context, insight.id);
+      let markerWriteFailed = false;
+      try {
+        await appendInsightMarkerForContext(context, insight.id);
+      } catch (markerError: any) {
+        markerWriteFailed = true;
+        Zotero.logError(markerError);
+      }
 
       this.state.savedInsightsByMessage[message.id] = insight.id;
       const previous = button.textContent;
@@ -1470,6 +1498,10 @@ export class ContextChatPanel {
       }, 1200);
       await this.refreshInsightsForCurrentContext();
       this.render();
+
+      if (markerWriteFailed) {
+        this.ownerWindow.alert(`Insight saved as ${insight.id}, but failed to write Zotero marker.`);
+      }
     } catch (error: any) {
       Zotero.logError(error);
       this.ownerWindow.alert(String(error?.message || error || "Failed to save insight."));
