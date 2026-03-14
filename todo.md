@@ -124,8 +124,9 @@ Conversation history must always be saved.
 Panel opens by explicit button click.
 
 ### 5.1 PDF entry
-- [ ] Add visible `Chat` entry in PDF reader
-- [ ] Bind it to paper context opening
+- [x] Add visible `Chat` entry in PDF reader
+- [x] Bind it to paper context opening
+- [x] Add visible `Chat` entry in snapshot reader
 
 ### 5.2 Item entry
 - [x] Add visible `Chat` entry for selected item workflows

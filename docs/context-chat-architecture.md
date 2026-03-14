@@ -60,7 +60,7 @@ This keeps plugin loadability stable while removing dependence on the legacy pop
 
 Implemented so far:
 
-- a visible `Chat` launcher button
+- a visible `Chat` toolbar button in PDF/snapshot reader
 - a fallback menu entry (`Sonder Chat Panel`) for stable opening
 - a large right-side global panel shell with draggable width resizing
 - explicit `paper` context resolution from the active reader tab

@@ -27,7 +27,6 @@ function formatTimestamp(timestamp: number) {
 const PANEL_WIDTH_STORAGE_KEY = "sonder.contextChat.panelWidth";
 
 export class ContextChatPanel {
-  private launcherButton!: HTMLButtonElement;
   private readonly onCopyShortcut = (event: KeyboardEvent) => {
     const isCopyKey = (event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() == "c";
     if (!isCopyKey) {
@@ -100,10 +99,9 @@ export class ContextChatPanel {
     if (!doc.getElementById("sonder-context-chat-style")) {
       this.installStyle();
     }
-    if (doc.getElementById("sonder-context-chat-launcher") || doc.getElementById("sonder-context-chat-panel")) {
+    if (doc.getElementById("sonder-context-chat-panel")) {
       return;
     }
-    this.buildLauncher();
     this.buildPanel();
     this.ownerWindow.addEventListener("keydown", this.onCopyShortcut, true);
     this.render();
@@ -115,7 +113,6 @@ export class ContextChatPanel {
 
   public destroy() {
     this.ownerWindow.removeEventListener("keydown", this.onCopyShortcut, true);
-    this.launcherButton?.remove();
     this.panel?.remove();
     this.ownerWindow.document.getElementById("sonder-context-chat-style")?.remove();
   }
@@ -124,29 +121,6 @@ export class ContextChatPanel {
     const style = createHTML(this.ownerWindow.document, "style");
     style.id = "sonder-context-chat-style";
     style.textContent = `
-      #sonder-context-chat-launcher {
-        position: fixed;
-        top: 76px;
-        right: 18px;
-        z-index: 2147483000;
-        border: none;
-        border-radius: 999px;
-        background: linear-gradient(135deg, #1f6feb 0%, #7c3aed 100%);
-        color: #fff;
-        padding: 10px 16px;
-        font-size: 13px;
-        font-weight: 600;
-        line-height: 1;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        box-shadow: 0 12px 28px rgba(31, 111, 235, 0.28);
-      }
-      #sonder-context-chat-launcher:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 14px 32px rgba(31, 111, 235, 0.35);
-      }
       #sonder-context-chat-panel {
         position: fixed;
         top: 0;
@@ -624,18 +598,6 @@ export class ContextChatPanel {
       }
     `;
     this.ownerWindow.document.documentElement.appendChild(style);
-  }
-
-  private buildLauncher() {
-    const doc = this.ownerWindow.document;
-    const button = createHTML(doc, "button");
-    button.id = "sonder-context-chat-launcher";
-    button.textContent = "Chat";
-    button.addEventListener("click", () => {
-      void this.openCurrentContext();
-    });
-    this.launcherButton = button;
-    doc.documentElement.appendChild(button);
   }
 
   private buildPanel() {
@@ -1577,7 +1539,6 @@ export class ContextChatPanel {
     const snapshot = this.state.snapshot;
     const hasContext = Boolean(snapshot);
     this.panel.style.display = this.state.visible ? "flex" : "none";
-    this.launcherButton.style.display = this.state.visible ? "none" : "";
 
     this.badge.textContent = this.getContextBadgeLabel();
     this.title.textContent = this.getContextTitle();

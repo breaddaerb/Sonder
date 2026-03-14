@@ -1,3 +1,4 @@
+import { config } from "../../package.json";
 import ContextChatPanel from "./panel";
 import ContextChatService from "./chatService";
 import ContextChatStore from "./storage";
@@ -7,8 +8,34 @@ export class ContextChatFeature {
   private readonly chatService = new ContextChatService(this.store);
   private readonly panels = new Map<Window, ContextChatPanel>();
   private readonly menuItems = new Map<Window, Element>();
+  private toolbarRegistered = false;
+
+  private readonly onRenderReaderToolbar: _ZoteroTypes.Reader.EventHandler<"renderToolbar"> = (event) => {
+    const reader = event.reader as _ZoteroTypes.ReaderInstance;
+    if (reader.type != "pdf" && reader.type != "snapshot") {
+      return;
+    }
+    const button = event.doc.createElement("button");
+    button.textContent = "Chat";
+    button.className = "toolbarButton";
+    button.title = "Open Sonder Chat Panel";
+    button.setAttribute("style", "margin-inline-start:8px;");
+    button.addEventListener("click", () => {
+      void this.openInWindow(Zotero.getMainWindow() as Window);
+    });
+    event.append(button);
+  };
+
+  private ensureReaderToolbarEntry() {
+    if (this.toolbarRegistered) {
+      return;
+    }
+    Zotero.Reader.registerEventListener("renderToolbar", this.onRenderReaderToolbar, config.addonID);
+    this.toolbarRegistered = true;
+  }
 
   public async start() {
+    this.ensureReaderToolbarEntry();
     const mainWindow = Zotero.getMainWindow();
     if (mainWindow) {
       await this.installWindow(mainWindow);
@@ -68,6 +95,10 @@ export class ContextChatFeature {
     this.panels.clear();
     this.menuItems.forEach((menuItem) => menuItem.remove());
     this.menuItems.clear();
+    if (this.toolbarRegistered) {
+      Zotero.Reader.unregisterEventListener("renderToolbar", this.onRenderReaderToolbar);
+      this.toolbarRegistered = false;
+    }
     await this.store.ready();
   }
 }

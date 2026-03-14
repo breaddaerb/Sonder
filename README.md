@@ -100,8 +100,8 @@ The rewrite now includes an experimental paper-chat panel as the primary UI surf
 
 Current behavior:
 
-- a visible `Chat` launcher button is mounted in the Zotero main window
-- clicking it with an active PDF or webpage snapshot reader tab opens a large right-side panel
+- a visible `Chat` button is injected into PDF/snapshot reader toolbar
+- clicking the reader `Chat` button with an active PDF or webpage snapshot opens a large right-side panel
 - a fallback `Sonder Chat Panel` Tools/Add-ons menu entry is installed for stable opening without shortcuts
 - the panel resolves explicit `Paper` context from the current PDF or webpage snapshot
 - selecting an annotation/note item in the library and clicking `Chat` opens `Item + Paper` context
