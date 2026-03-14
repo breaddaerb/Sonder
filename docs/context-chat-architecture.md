@@ -14,7 +14,7 @@ These inherited parts remain the preserved baseline and should not be casually r
 - add-on packaging/output shape
 - provider selection and transport plumbing
 - Codex OAuth implementation
-- legacy `Views` runtime as fallback while the new panel is incomplete
+- panel-first runtime without legacy popup/command module dependencies
 
 ## New rewrite tree
 
@@ -47,14 +47,14 @@ Current rewrite modules:
 
 ## Legacy boundary
 
-The inherited legacy surface remains in place for now:
+The inherited legacy surface has been narrowed and no longer drives startup runtime:
 
-- `src/modules/views.ts`
-- command-tag-first entry flow
-- shortcut-centric popup UX
-- legacy in-memory session/message handling tied to `Views`
+- popup runtime module `src/modules/views.ts` has been removed
+- legacy views-coupled OpenAI helper paths are removed from active runtime usage
+- startup no longer binds any `views` runtime object
+- command-tag and popup-first paths are removed from primary runtime and replaced by panel/menu UX
 
-This is intentional so the new panel can be built incrementally without risking plugin loadability.
+This keeps plugin loadability stable while removing dependence on the legacy popup architecture.
 
 ## Current implemented scope
 

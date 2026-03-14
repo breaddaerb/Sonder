@@ -45,6 +45,15 @@ export class ContextChatFeature {
     this.installMenuEntry(window, panel);
   }
 
+  public async openInWindow(window?: Window) {
+    const target = window || Zotero.getMainWindow();
+    if (!target) {
+      return;
+    }
+    await this.installWindow(target);
+    this.panels.get(target)?.open();
+  }
+
   public uninstallWindow(window: Window) {
     const panel = this.panels.get(window);
     panel?.destroy();

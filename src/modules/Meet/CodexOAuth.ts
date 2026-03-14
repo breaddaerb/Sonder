@@ -1,4 +1,4 @@
-import Meet from "./api";
+import meetState from "./state";
 import { clearCodexCredentials, getCodexCredentials, setCodexCredentials } from "../provider";
 
 const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
@@ -62,7 +62,7 @@ export async function startCodexOAuthLogin(originator: string = "sonder") {
   url.searchParams.set("id_token_add_organizations", "true");
   url.searchParams.set("codex_cli_simplified_flow", "true");
   url.searchParams.set("originator", originator);
-  Meet.Global.codexOAuth = { state, verifier };
+  meetState.codexOAuth = { state, verifier };
   return {
     url: url.toString(),
     state,
@@ -128,16 +128,16 @@ async function exchangeToken(body: URLSearchParams) {
 }
 
 export async function finishCodexOAuthLogin(input: string) {
-  const pending = Meet.Global.codexOAuth as { state: string; verifier: string } | undefined;
+  const pending = meetState.codexOAuth as { state: string; verifier: string } | undefined;
   if (!pending?.state || !pending?.verifier) {
-    throw new Error("No OAuth login is in progress. Run /login first.");
+    throw new Error("No OAuth login is in progress. Use the panel header 'Login Codex' first.");
   }
   const parsed = parseAuthorizationInput(input);
   if (!parsed.code) {
     throw new Error("Missing authorization code. Paste the full redirect URL or the code.");
   }
   if (parsed.state && parsed.state !== pending.state) {
-    throw new Error("OAuth state mismatch. Please run /login again.");
+    throw new Error("OAuth state mismatch. Start login again from panel header 'Login Codex'.");
   }
   const credentials = await exchangeToken(new URLSearchParams({
     grant_type: "authorization_code",
@@ -146,14 +146,14 @@ export async function finishCodexOAuthLogin(input: string) {
     code_verifier: pending.verifier,
     redirect_uri: REDIRECT_URI,
   }));
-  Meet.Global.codexOAuth = undefined;
+  meetState.codexOAuth = undefined;
   return credentials;
 }
 
 export async function refreshCodexAccessToken() {
   const credentials = getCodexCredentials();
   if (!credentials.refresh) {
-    throw new Error("No Codex refresh token found. Run /login first.");
+    throw new Error("No Codex refresh token found. Use panel header 'Login Codex' first.");
   }
   const refreshed = await exchangeToken(new URLSearchParams({
     grant_type: "refresh_token",
@@ -166,7 +166,7 @@ export async function refreshCodexAccessToken() {
 export async function getValidCodexAccessToken() {
   let credentials = getCodexCredentials();
   if (!credentials.refresh && !credentials.access) {
-    throw new Error("No Codex credentials found. Run /provider openai-codex then /login.");
+    throw new Error("No Codex credentials found. Enable Codex provider and login from panel header.");
   }
   if (credentials.expires && Date.now() < credentials.expires - 60 * 1000 && credentials.access && credentials.accountId) {
     return credentials;
@@ -176,7 +176,7 @@ export async function getValidCodexAccessToken() {
 }
 
 export function clearCodexLogin() {
-  Meet.Global.codexOAuth = undefined;
+  meetState.codexOAuth = undefined;
   clearCodexCredentials();
 }
 
@@ -184,6 +184,6 @@ export function getCodexLoginReport() {
   const credentials = getCodexCredentials();
   return {
     ...credentials,
-    hasPendingLogin: Boolean(Meet.Global.codexOAuth?.state),
+    hasPendingLogin: Boolean(meetState.codexOAuth?.state),
   };
 }

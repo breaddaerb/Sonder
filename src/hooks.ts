@@ -1,8 +1,6 @@
 import { config } from "../package.json";
 import ContextChatFeature from "./context-chat";
 import { initLocale } from "./modules/locale";
-import Views from "./modules/views";
-import Utils from "./modules/utils";
 
 async function onStartup() {
   await Promise.all([
@@ -19,9 +17,6 @@ async function onStartup() {
     "default",
     `chrome://${config.addonRef}/content/icons/favicon.png`
   );
-
-  Zotero[config.addonInstance].views = new Views();
-  Zotero[config.addonInstance].utils = new Utils();
 
   const contextChat = new ContextChatFeature();
   addon.api.contextChat = contextChat;

@@ -2,8 +2,7 @@ import { config } from "../../../package.json";
 import { MD5 } from "crypto-js"
 import { Document } from "langchain/document";
 import LocalStorage from "../localStorage";
-import Views from "../views";
-import Meet from "./api";
+import meetState from "./state";
 import { getValidCodexAccessToken } from "./CodexOAuth";
 import { getCurrentModel, getProvider, supportsEmbeddings } from "../provider";
 const similarity = require('compute-cosine-similarity');
@@ -43,37 +42,6 @@ const requestArgs: RequestArg[] = [
 
 const CODEX_BASE_URL = "https://chatgpt.com/backend-api/codex/responses";
 const CODEX_INSTRUCTIONS = "You are a helpful assistant inside the Zotero plugin Sonder. Answer clearly, be concise when possible, and reply in the same language as the user's message unless they ask otherwise.";
-
-function startStreamingOutput(views: Views) {
-  const deltaTime = Zotero.Prefs.get(`${config.addonRef}.deltaTime`) as number
-  let previewText = ""
-  let responseText: string | undefined
-  views.stopAlloutput()
-  views.setText("")
-  const id: number = window.setInterval(() => {
-    if (responseText === undefined && previewText.length == 0) { return }
-    if (previewText.length > 0 || responseText !== undefined) {
-      views.setText(previewText)
-    }
-    if (responseText !== undefined && responseText === previewText) {
-      views.setText(previewText, true)
-      window.clearInterval(id)
-    }
-  }, deltaTime)
-  views._ids.push({
-    type: "output",
-    id: id
-  })
-  return {
-    setPreviewText(text: string) {
-      previewText = text
-    },
-    finish(text: string) {
-      previewText = text
-      responseText = text
-    }
-  }
-}
 
 function parseOpenAIText(raw: string) {
   try {
@@ -167,7 +135,7 @@ function formatCodexError(error: any) {
  * @returns
  */
 export async function similaritySearch(queryText: string, docs: Document[], obj: { key: string }) {
-  const storage = Meet.Global.storage = Meet.Global.storage || new LocalStorage(config.addonRef)
+  const storage = meetState.storage = meetState.storage || new LocalStorage(config.addonRef)
   await storage.lock.promise;
   const embeddings = new OpenAIEmbeddings() as any
   const id = MD5(docs.map((i: any) => i.pageContent).join("\n\n")).toString()
@@ -176,10 +144,8 @@ export async function similaritySearch(queryText: string, docs: Document[], obj:
   ztoolkit.log(_vv)
   let vv: any
   if (_vv) {
-    Meet.Global.popupWin.createLine({ text: "Reading embeddings...", type: "default" })
     vv = _vv
   } else {
-    Meet.Global.popupWin.createLine({ text: "Generating embeddings...", type: "default" })
     vv = await embeddings.embedDocuments(docs.map((i: any) => i.pageContent))
     window.setTimeout(async () => {
       await storage.set(obj, id, vv)
@@ -188,7 +154,6 @@ export async function similaritySearch(queryText: string, docs: Document[], obj:
 
   const v0 = await embeddings.embedQuery(queryText)
   const relatedNumber = Zotero.Prefs.get(`${config.addonRef}.relatedNumber`) as number
-  Meet.Global.popupWin.createLine({ text: `Searching ${relatedNumber} related content...`, type: "default" })
   const k = relatedNumber * 5
   const pp = vv.map((v: any) => similarity(v0, v));
   docs = [...pp].sort((a, b) => b - a).slice(0, k).map((p: number) => {
@@ -201,9 +166,7 @@ class OpenAIEmbeddings {
   constructor() {
   }
   private async request(input: string[]) {
-    const views = Zotero[config.addonInstance].views as Views
     if (!supportsEmbeddings()) {
-      views.setText("# Embeddings unavailable\n> The current provider does not support embeddings. Switch to `/provider openai-api` to use retrieval mode.", true)
       throw new Error("Embeddings are unavailable for the current provider.")
     }
     let api = Zotero.Prefs.get(`${config.addonRef}.api`) as string
@@ -241,7 +204,6 @@ class OpenAIEmbeddings {
       } catch (error: any) {
         try {
           error = error.xmlhttp.response?.error
-          views.setText(`# ${error.code}\n> ${url}\n\n**${error.type}**\n${error.message}`, true)
           new ztoolkit.ProgressWindow(error.code, { closeOtherProgressWindows: true })
             .createLine({ text: error.message, type: "default" })
             .show()
@@ -462,86 +424,6 @@ export async function requestProviderChat(
     return await requestFallbackChat(requestArgs[1], messages, options)
   }
   return await requestOpenAIChat(messages, options)
-}
-
-export async function getGPTResponse(requestText: string) {
-  const provider = getProvider()
-  if (provider == "openai-codex") {
-    return await getGPTResponseByCodex(requestText)
-  }
-  const secretKey = Zotero.Prefs.get(`${config.addonRef}.secretKey`)
-  if (!secretKey) { return await getGPTResponseBy(requestArgs[1], requestText) }
-  return await getGPTResponseByOpenAI(requestText)
-}
-
-export async function getGPTResponseByOpenAI(requestText: string) {
-  const views = Zotero[config.addonInstance].views as Views
-  views.messages.push({
-    role: "user",
-    content: requestText
-  })
-  const streaming = startStreamingOutput(views)
-  const result = await requestOpenAIChat(views.messages as TransportChatMessage[], {
-    onText(text) {
-      streaming.setPreviewText(text)
-    }
-  })
-  streaming.finish(result.content)
-  views.messages.push({
-    role: "assistant",
-    content: result.content
-  })
-  return result.content
-}
-
-export async function getGPTResponseByCodex(requestText: string) {
-  const views = Zotero[config.addonInstance].views as Views
-  views.messages.push({
-    role: "user",
-    content: requestText,
-  })
-  const streaming = startStreamingOutput(views)
-  const result = await requestCodexChat(views.messages as TransportChatMessage[], {
-    onText(text) {
-      streaming.setPreviewText(text)
-    }
-  })
-  streaming.finish(result.content)
-  views.messages.push({
-    role: "assistant",
-    content: result.content,
-  })
-  return result.content
-}
-
-/**
- * 返回值要是纯文本
- * @param requestArg
- * @param requestText
- * @param views
- * @returns
- */
-export async function getGPTResponseBy(
-  requestArg: RequestArg,
-  requestText: string,
-) {
-  const views = Zotero[config.addonInstance].views as Views
-  views.messages.push({
-    role: "user",
-    content: requestText
-  })
-  const streaming = startStreamingOutput(views)
-  const result = await requestFallbackChat(requestArg, views.messages as TransportChatMessage[], {
-    onText(text) {
-      streaming.setPreviewText(text)
-    }
-  })
-  streaming.finish(result.content)
-  views.messages.push({
-    role: "assistant",
-    content: result.content
-  })
-  return result.content
 }
 
 // --- Custom API connection test ---
