@@ -276,6 +276,8 @@ export class ContextChatStore {
       await this.migrateLegacyJsonIfNeeded();
     } catch (error: any) {
       Zotero.logError(error);
+      const message = error?.message || String(error) || "Unknown SQLite initialization error";
+      throw new Error(`Failed to initialize context chat SQLite storage: ${message}`);
     }
   }
 
