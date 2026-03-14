@@ -1491,6 +1491,16 @@ export class ContextChatPanel {
       }
 
       this.state.savedInsightsByMessage[message.id] = insight.id;
+      const currentSnapshot = this.state.snapshot;
+      const isSameSessionContext = Boolean(
+        currentSnapshot
+        && currentSnapshot.session.id == snapshot.session.id
+        && currentSnapshot.context.id == context.id,
+      );
+      if (!isSameSessionContext) {
+        return;
+      }
+
       const previous = button.textContent;
       button.textContent = "✓";
       this.ownerWindow.setTimeout(() => {
