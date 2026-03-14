@@ -6,6 +6,7 @@ const { spawnSync } = require("child_process");
 
 const TEST_FILES = [
   "context-chat-model.test.ts",
+  "context-chat-storage-sqlite.test.ts",
   "custom-api-provider.test.ts",
 ];
 

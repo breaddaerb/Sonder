@@ -78,7 +78,7 @@ Conversation history must always be saved.
   - [x] `Message`
 - [x] Decide ID conventions
   - [x] `paper:<attachmentKey>`
-  - [ ] `itempaper:<itemKey>:<paperKey>`
+  - [x] `itempaper:<itemKey>:<paperKey>`
 - [x] Decide timestamps and ordering rules
 
 ### 3.2 Storage backend
@@ -95,6 +95,48 @@ Conversation history must always be saved.
   - [x] clear/delete session (if included in V1)
 - [x] Add migration-safe error handling
 - [ ] Add simple dev inspection/logging helpers
+
+### 3.3 SQLite migration plan (pre-insight prerequisite)
+
+Rationale: JSON-file storage was sufficient for MVP but is now a scale/reliability bottleneck. Before implementing dialogue-to-insight anchoring, migrate dialogue persistence to SQLite.
+
+- [x] Add SQLite storage layer (`context-chat.sqlite`) with schema versioning
+- [x] Initialize DB on plugin start if missing
+- [x] Add tables and indexes
+  - [x] `sessions` table
+    - [x] `id` (PK)
+    - [x] `context_id`
+    - [x] `item_key` (nullable)
+    - [x] `paper_key` (nullable)
+    - [x] `title`, `provider`, `model`
+    - [x] `created_at`, `updated_at`
+  - [x] `messages` table
+    - [x] `id` (PK)
+    - [x] `session_id` (FK)
+    - [x] `role`, `content`
+    - [x] `citations_json` (nullable)
+    - [x] `created_at`
+  - [x] index `sessions(context_id, updated_at DESC)`
+  - [x] index `sessions(item_key, updated_at DESC)`
+  - [x] index `messages(session_id, created_at ASC)`
+- [x] Replace JSON read/write calls with SQL operations in `ContextChatStore`
+  - [x] create session
+  - [x] append message
+  - [x] get session snapshot by id
+  - [x] list sessions by context
+  - [x] list sessions by item key
+  - [x] update `updated_at` transactionally on writes
+- [x] Ensure transactional integrity + write durability
+  - [x] wrap writes in transactions
+  - [x] enable WAL/safe pragmas where supported
+- [x] One-time migration from JSON to SQLite
+  - [x] detect legacy JSON (`context-chat.json`) and empty DB
+  - [x] import all contexts/sessions/messages in one transaction
+  - [x] keep backup (`context-chat.json.bak`) after successful import
+  - [x] make migration idempotent (safe on restart)
+- [x] Keep external store API stable for panel/service callers
+- [x] Add tests for migration + CRUD parity
+- [ ] Manual verification: existing chat history is preserved post-migration
 
 ---
 
@@ -240,7 +282,57 @@ User promise: the selected item is the anchor, and the paper provides background
 
 ---
 
-## 9. Session/history UX
+## 9. Dialogue-to-Insight Anchoring
+
+Prerequisite: complete SQLite migration in `3.3` first.
+
+Goal: allow users to preserve high-value dialogue outputs as structured insights bound to Zotero item/annotation context.
+
+### 9.1 Insight data model (Sonder-side)
+- [ ] Add `Insight` persisted entity
+  - [ ] `id`
+  - [ ] `item_key` (or library+item key)
+  - [ ] `annotation_key` (nullable)
+  - [ ] `session_id`
+  - [ ] `message_id` (nullable, when saved from a specific assistant response)
+  - [ ] `content` (markdown, long-form)
+  - [ ] `created_at`
+- [ ] Add storage APIs
+  - [ ] create insight
+  - [ ] list insights by item
+  - [ ] list insights by item+annotation
+  - [ ] get insight by id
+
+### 9.2 Dialogue UI action
+- [ ] Add one-click `Save insight` action on assistant message blocks
+- [ ] Save selected assistant response as insight (V1)
+- [ ] Show inline save confirmation with generated `insight_id`
+- [ ] Keep action frictionless (single-click path)
+
+### 9.3 Zotero marker write-back (lightweight pointer only)
+- [ ] For annotation-anchored saves, append marker text:
+  - [ ] `→ Sonder insight [insight_id]`
+- [ ] Do **not** store full insight content in Zotero annotation fields
+- [ ] Ensure marker append is non-destructive (preserve existing annotation comment)
+
+### 9.4 Retrieval UX
+- [ ] Show saved insights inline after save (current session context)
+- [ ] Add `Insights for this item` view/list in panel
+- [ ] Allow reopening an insight and continuing dialogue from its source session
+- [ ] (Later) cross-item insight retrieval/search
+
+### 9.5 Validation and migration safety
+- [ ] Ensure existing chat/session behavior remains unchanged
+- [ ] Add tests for insight CRUD and item/annotation filtering
+- [ ] Add tests for marker write-back behavior
+- [ ] Manual verification in Zotero
+  - [ ] save insight from item+paper dialogue
+  - [ ] marker visible on source annotation
+  - [ ] reopen associated session and continue asking
+
+---
+
+## 10. Session/history UX
 
 History must be saved, but not always shown expanded.
 
@@ -258,7 +350,7 @@ Optional-but-likely-later:
 
 ---
 
-## 10. Assistant transport integration
+## 11. Assistant transport integration
 
 The new UI/context system should reuse the already working backend pieces.
 
@@ -271,7 +363,7 @@ The new UI/context system should reuse the already working backend pieces.
 
 ---
 
-## 10.1 Custom API provider configuration
+## 11.1 Custom API provider configuration
 
 The panel now supports configuring a custom OpenAI-compatible API endpoint alongside Codex OAuth.
 
@@ -286,7 +378,7 @@ The panel now supports configuring a custom OpenAI-compatible API endpoint along
 
 ---
 
-## 10.2 Webpage snapshot support
+## 11.2 Webpage snapshot support
 
 The context chat panel now supports webpage snapshot (HTML) attachments alongside PDFs.
 
@@ -304,7 +396,7 @@ The context chat panel now supports webpage snapshot (HTML) attachments alongsid
 
 ---
 
-## 11. Source citations and navigation
+## 12. Source citations and navigation
 
 A core value of paper chat is being able to jump back to source.
 
@@ -319,7 +411,7 @@ A core value of paper chat is being able to jump back to source.
 
 ---
 
-## 12. Formula rendering strategy
+## 13. Formula rendering strategy
 
 Current inherited baseline disables the old MathJax plugin path because it broke Zotero sandbox startup.
 
@@ -333,7 +425,7 @@ This is important because one major product requirement is explaining paper form
 
 ---
 
-## 13. Legacy command tags
+## 14. Legacy command tags
 
 Command tags are no longer the main product surface.
 
@@ -347,7 +439,7 @@ Command tags are no longer the main product surface.
 
 ---
 
-## 14. Cleanup inherited baseline issues
+## 15. Cleanup inherited baseline issues
 
 These are not blockers for the migration baseline, but they should be cleaned up deliberately.
 
@@ -364,7 +456,7 @@ These are not blockers for the migration baseline, but they should be cleaned up
 
 ---
 
-## 15. Suggested implementation order
+## 16. Suggested implementation order
 
 Recommended sequence for happy coding:
 
@@ -402,7 +494,7 @@ Recommended sequence for happy coding:
 
 ---
 
-## 16. V1 acceptance checklist
+## 17. V1 acceptance checklist
 
 Sonder V1 should satisfy all of these:
 
@@ -439,7 +531,7 @@ Sonder V1 should satisfy all of these:
 
 ---
 
-## 17. Near-term first coding target
+## 18. Near-term first coding target
 
 If starting implementation immediately, the first concrete milestone should be:
 

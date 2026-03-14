@@ -9,10 +9,28 @@ class LocalStorage {
     this.init(filename)
   }
 
+  private getOS() {
+    const mainWindow = Zotero.getMainWindow() as any;
+    if (mainWindow?.OS) {
+      return mainWindow.OS;
+    }
+    const globalOS = (globalThis as any).OS;
+    if (globalOS?.File && globalOS?.Path) {
+      return globalOS;
+    }
+    try {
+      const imported = (globalThis as any).ChromeUtils?.import?.("resource://gre/modules/osfile.jsm");
+      if (imported?.OS?.File && imported?.OS?.Path) {
+        return imported.OS;
+      }
+    } catch {
+      // fall through
+    }
+    throw new Error("OS.File is unavailable in current Zotero runtime.");
+  }
+
   async init(filename: string) {
-    const window = Zotero.getMainWindow();
-    // @ts-ignore
-    const OS = window.OS;
+    const OS = this.getOS();
     if (!(await OS.File.exists(filename))) {
       const temp = Zotero.getTempDirectory();
       this.filename = OS.Path.join(temp.path.replace(temp.leafName, ""), `${filename}.json`);
