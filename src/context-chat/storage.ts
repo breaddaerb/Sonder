@@ -258,6 +258,8 @@ export class ContextChatStore {
       await this.backupLegacyJsonIfNeeded();
     } catch (error: any) {
       Zotero.logError(error);
+      const message = error?.message || String(error) || "Unknown legacy JSON migration error";
+      throw new Error(`Failed to migrate legacy context-chat.json to SQLite: ${message}`);
     }
   }
 
