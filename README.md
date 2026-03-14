@@ -117,6 +117,8 @@ Current behavior:
 - `Send` and `Enter` submit a message
 - `Shift+Enter` inserts a newline
 - multi-turn user/assistant messages are persisted per session
+- persisted chat storage now uses SQLite at `<Zotero profile>/sonder/context-chat.sqlite`
+- one-time migration imports legacy JSON from `<Zotero profile>/sonder/context-chat.json` and keeps a backup at `context-chat.json.bak`
 - the panel prepares chunked context from the active PDF or webpage snapshot and retrieves relevant chunks per question
 - responses are now grounded with retrieved paper context in the panel transport path
 - assistant messages show lightweight citation chips for retrieved paper chunks
