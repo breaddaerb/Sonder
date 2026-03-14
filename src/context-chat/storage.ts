@@ -7,10 +7,12 @@ import {
   PaperContextDescriptor,
   SessionSnapshot,
   StoredContext,
+  StoredInsight,
   StoredMessage,
   StoredSession,
   createEmptyStoreData,
   createItemPaperContextId,
+  createInsightId,
   createMessageId,
   createPaperContextId,
   createSessionId,
@@ -166,9 +168,25 @@ export class ContextChatStore {
       )
     `);
 
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS insights (
+        id TEXT PRIMARY KEY,
+        item_key TEXT NOT NULL,
+        library_id INTEGER,
+        annotation_key TEXT,
+        session_id TEXT NOT NULL,
+        message_id TEXT,
+        content TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
+      )
+    `);
+
     await db.execute("CREATE INDEX IF NOT EXISTS idx_sessions_context_updated ON sessions(context_id, updated_at DESC)");
     await db.execute("CREATE INDEX IF NOT EXISTS idx_sessions_item_updated ON sessions(item_key, updated_at DESC)");
     await db.execute("CREATE INDEX IF NOT EXISTS idx_messages_session_created ON messages(session_id, created_at ASC)");
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_insights_item_created ON insights(item_key, created_at DESC)");
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_insights_item_annotation_created ON insights(item_key, annotation_key, created_at DESC)");
   }
 
   private ensureDb() {
@@ -371,6 +389,19 @@ export class ContextChatStore {
       content: this.getRowValue<string>(row, "content"),
       createdAt: Number(this.getRowValue<number>(row, "created_at")),
       citations,
+    };
+  }
+
+  private rowToInsight(row: any): StoredInsight {
+    return {
+      id: this.getRowValue<string>(row, "id"),
+      itemKey: this.getRowValue<string>(row, "item_key"),
+      libraryID: this.getRowValue<number | null>(row, "library_id") ?? undefined,
+      annotationKey: this.getRowValue<string | null>(row, "annotation_key") || undefined,
+      sessionId: this.getRowValue<string>(row, "session_id"),
+      messageId: this.getRowValue<string | null>(row, "message_id") || undefined,
+      content: this.getRowValue<string>(row, "content"),
+      createdAt: Number(this.getRowValue<number>(row, "created_at")),
     };
   }
 
@@ -693,6 +724,109 @@ export class ContextChatStore {
   public async listSessions(contextId: string) {
     await this.ready();
     return sortSessionsByUpdatedAt(await this.getSessionsForContext(contextId));
+  }
+
+  public async createInsight(input: {
+    itemKey: string;
+    libraryID?: number;
+    annotationKey?: string;
+    sessionId: string;
+    messageId?: string;
+    content: string;
+    createdAt?: number;
+  }): Promise<StoredInsight> {
+    await this.ready();
+    const db = this.ensureDb();
+    const now = input.createdAt || Date.now();
+    const insight: StoredInsight = {
+      id: createInsightId(now),
+      itemKey: input.itemKey,
+      libraryID: input.libraryID,
+      annotationKey: input.annotationKey,
+      sessionId: input.sessionId,
+      messageId: input.messageId,
+      content: input.content,
+      createdAt: now,
+    };
+
+    await db.execute(
+      `INSERT INTO insights (
+        id, item_key, library_id, annotation_key, session_id, message_id, content, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        insight.id,
+        insight.itemKey,
+        insight.libraryID ?? null,
+        insight.annotationKey || null,
+        insight.sessionId,
+        insight.messageId || null,
+        insight.content,
+        insight.createdAt,
+      ],
+    );
+
+    return insight;
+  }
+
+  public async getInsightById(insightId: string): Promise<StoredInsight | undefined> {
+    await this.ready();
+    const db = this.ensureDb();
+    const rows = await db.execute(
+      `SELECT id, item_key, library_id, annotation_key, session_id, message_id, content, created_at
+       FROM insights WHERE id = ? LIMIT 1`,
+      [insightId],
+    );
+    if (!rows.length) {
+      return undefined;
+    }
+    return this.rowToInsight(rows[0]);
+  }
+
+  public async listInsightsByItemKey(itemKey: string, libraryID?: number): Promise<StoredInsight[]> {
+    await this.ready();
+    const db = this.ensureDb();
+    const rows = libraryID == undefined
+      ? await db.execute(
+          `SELECT id, item_key, library_id, annotation_key, session_id, message_id, content, created_at
+           FROM insights
+           WHERE item_key = ?
+           ORDER BY created_at DESC`,
+          [itemKey],
+        )
+      : await db.execute(
+          `SELECT id, item_key, library_id, annotation_key, session_id, message_id, content, created_at
+           FROM insights
+           WHERE item_key = ? AND library_id = ?
+           ORDER BY created_at DESC`,
+          [itemKey, libraryID],
+        );
+
+    return rows.map((row) => this.rowToInsight(row));
+  }
+
+  public async listInsightsByItemAndAnnotation(
+    itemKey: string,
+    annotationKey: string,
+    libraryID?: number,
+  ): Promise<StoredInsight[]> {
+    await this.ready();
+    const db = this.ensureDb();
+    const rows = libraryID == undefined
+      ? await db.execute(
+          `SELECT id, item_key, library_id, annotation_key, session_id, message_id, content, created_at
+           FROM insights
+           WHERE item_key = ? AND annotation_key = ?
+           ORDER BY created_at DESC`,
+          [itemKey, annotationKey],
+        )
+      : await db.execute(
+          `SELECT id, item_key, library_id, annotation_key, session_id, message_id, content, created_at
+           FROM insights
+           WHERE item_key = ? AND annotation_key = ? AND library_id = ?
+           ORDER BY created_at DESC`,
+          [itemKey, annotationKey, libraryID],
+        );
+    return rows.map((row) => this.rowToInsight(row));
   }
 
   public async listSessionsByItemKey(itemKey: string): Promise<StoredSession[]> {
