@@ -37,8 +37,13 @@ export class ContextChatFeature {
   public async start() {
     this.ensureReaderToolbarEntry();
     const mainWindow = Zotero.getMainWindow();
-    if (mainWindow) {
+    if (!mainWindow) {
+      return;
+    }
+    try {
       await this.installWindow(mainWindow);
+    } catch (error: any) {
+      Zotero.logError(error);
     }
   }
 
@@ -77,8 +82,13 @@ export class ContextChatFeature {
     if (!target) {
       return;
     }
-    await this.installWindow(target);
-    this.panels.get(target)?.open();
+    try {
+      await this.installWindow(target);
+      this.panels.get(target)?.open();
+    } catch (error: any) {
+      Zotero.logError(error);
+      target.alert(String(error?.message || error || "Failed to open Sonder Chat Panel."));
+    }
   }
 
   public uninstallWindow(window: Window) {

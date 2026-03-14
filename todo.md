@@ -289,42 +289,42 @@ Prerequisite: complete SQLite migration in `3.3` first.
 Goal: allow users to preserve high-value dialogue outputs as structured insights bound to Zotero item/annotation context.
 
 ### 9.1 Insight data model (Sonder-side)
-- [ ] Add `Insight` persisted entity
-  - [ ] `id`
-  - [ ] `item_key` (or library+item key)
-  - [ ] `annotation_key` (nullable)
-  - [ ] `session_id`
-  - [ ] `message_id` (nullable, when saved from a specific assistant response)
-  - [ ] `content` (markdown, long-form)
-  - [ ] `created_at`
-- [ ] Add storage APIs
-  - [ ] create insight
-  - [ ] list insights by item
-  - [ ] list insights by item+annotation
-  - [ ] get insight by id
+- [x] Add `Insight` persisted entity
+  - [x] `id`
+  - [x] `item_key` (or library+item key)
+  - [x] `annotation_key` (nullable)
+  - [x] `session_id`
+  - [x] `message_id` (nullable, when saved from a specific assistant response)
+  - [x] `content` (markdown, long-form)
+  - [x] `created_at`
+- [x] Add storage APIs
+  - [x] create insight
+  - [x] list insights by item
+  - [x] list insights by item+annotation
+  - [x] get insight by id
 
 ### 9.2 Dialogue UI action
-- [ ] Add one-click `Save insight` action on assistant message blocks
-- [ ] Save selected assistant response as insight (V1)
-- [ ] Show inline save confirmation with generated `insight_id`
-- [ ] Keep action frictionless (single-click path)
+- [x] Add one-click `Save insight` action on assistant message blocks
+- [x] Save selected assistant response as insight (V1)
+- [x] Show inline save confirmation with generated `insight_id`
+- [x] Keep action frictionless (single-click path)
 
 ### 9.3 Zotero marker write-back (lightweight pointer only)
-- [ ] For annotation-anchored saves, append marker text:
-  - [ ] `→ Sonder insight [insight_id]`
-- [ ] Do **not** store full insight content in Zotero annotation fields
-- [ ] Ensure marker append is non-destructive (preserve existing annotation comment)
+- [x] For annotation-anchored saves, append marker text:
+  - [x] `→ Sonder insight [insight_id]`
+- [x] Do **not** store full insight content in Zotero annotation fields
+- [x] Ensure marker append is non-destructive (preserve existing annotation comment)
 
 ### 9.4 Retrieval UX
-- [ ] Show saved insights inline after save (current session context)
-- [ ] Add `Insights for this item` view/list in panel
-- [ ] Allow reopening an insight and continuing dialogue from its source session
+- [x] Show saved insights inline after save (current session context)
+- [x] Add `Insights for this item` view/list in panel
+- [x] Allow reopening an insight and continuing dialogue from its source session
 - [ ] (Later) cross-item insight retrieval/search
 
 ### 9.5 Validation and migration safety
-- [ ] Ensure existing chat/session behavior remains unchanged
-- [ ] Add tests for insight CRUD and item/annotation filtering
-- [ ] Add tests for marker write-back behavior
+- [x] Ensure existing chat/session behavior remains unchanged
+- [x] Add tests for insight CRUD and item/annotation filtering
+- [x] Add tests for marker write-back behavior
 - [ ] Manual verification in Zotero
   - [ ] save insight from item+paper dialogue
   - [ ] marker visible on source annotation

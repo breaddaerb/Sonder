@@ -79,6 +79,17 @@ export interface SessionSnapshot {
   messages: StoredMessage[];
 }
 
+export interface StoredInsight {
+  id: string;
+  itemKey: string;
+  libraryID?: number;
+  annotationKey?: string;
+  sessionId: string;
+  messageId?: string;
+  content: string;
+  createdAt: number;
+}
+
 export function createEmptyStoreData(): ContextChatStoreData {
   return {
     version: 1,
@@ -102,6 +113,10 @@ export function createSessionId(now: number = Date.now(), randomValue: number = 
 
 export function createMessageId(now: number = Date.now(), randomValue: number = Math.random()) {
   return `message:${now}:${Math.floor(randomValue * 1e8).toString(36)}`;
+}
+
+export function createInsightId(now: number = Date.now(), randomValue: number = Math.random()) {
+  return `insight:${now}:${Math.floor(randomValue * 1e8).toString(36)}`;
 }
 
 export function createSessionTitle(index: number) {

@@ -7,7 +7,8 @@ import { getCurrentModel, getProvider, hasCodexCredentials, setProvider, getCust
 import { testCustomApiConnection } from "../modules/Meet/OpenAI";
 import { renderMessageHTML } from "./render";
 import ContextChatStore from "./storage";
-import { SessionSnapshot, StoredMessage } from "./types";
+import { appendInsightMarkerForContext } from "./insightMarker";
+import { SessionSnapshot, StoredInsight, StoredMessage } from "./types";
 
 const HTML_NS = "http://www.w3.org/1999/xhtml";
 
@@ -27,6 +28,8 @@ function formatTimestamp(timestamp: number) {
 const PANEL_WIDTH_STORAGE_KEY = "sonder.contextChat.panelWidth";
 
 export class ContextChatPanel {
+  private insightRefreshSerial = 0;
+
   private readonly onCopyShortcut = (event: KeyboardEvent) => {
     const isCopyKey = (event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() == "c";
     if (!isCopyKey) {
@@ -76,6 +79,9 @@ export class ContextChatPanel {
     snapshot?: SessionSnapshot;
     error?: string;
     panelWidth?: number;
+    savedInsightsByMessage: Record<string, string>;
+    insights: StoredInsight[];
+    insightsLoading: boolean;
   } = {
     visible: false,
     loading: false,
@@ -84,6 +90,9 @@ export class ContextChatPanel {
     viewMode: "raw",
     draft: "",
     assistantPreviewText: "",
+    savedInsightsByMessage: {},
+    insights: [],
+    insightsLoading: false,
   };
 
   constructor(
@@ -237,7 +246,6 @@ export class ContextChatPanel {
       }
       #sonder-context-chat-panel .sonder-action,
       #sonder-context-chat-panel .sonder-close,
-      #sonder-context-chat-panel .sonder-history-item,
       #sonder-context-chat-panel .sonder-send {
         border: 1px solid #dbe2ea;
         background: #fff;
@@ -262,7 +270,6 @@ export class ContextChatPanel {
       }
       #sonder-context-chat-panel .sonder-action:hover,
       #sonder-context-chat-panel .sonder-close:hover,
-      #sonder-context-chat-panel .sonder-history-item:hover,
       #sonder-context-chat-panel .sonder-send:hover {
         background: #f8fafc;
       }
@@ -285,14 +292,21 @@ export class ContextChatPanel {
       #sonder-context-chat-panel .sonder-history-drawer {
         display: none;
         flex-direction: column;
-        gap: 8px;
+        gap: 10px;
         border-top: 1px solid #e5e7eb;
         padding-top: 12px;
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 12px;
+        width: 100%;
+        box-sizing: border-box;
+        align-self: stretch;
       }
       #sonder-context-chat-panel .sonder-history-drawer.is-open {
         display: flex;
       }
       #sonder-context-chat-panel .sonder-history-meta {
+        width: 100%;
         font-size: 12px;
         color: #64748b;
       }
@@ -300,25 +314,45 @@ export class ContextChatPanel {
         display: flex;
         flex-direction: column;
         gap: 8px;
-        max-height: 180px;
+        max-height: 220px;
         overflow: auto;
+        width: 100%;
       }
       #sonder-context-chat-panel .sonder-history-item {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #dbe2ea;
+        background: #fff;
+        color: #0f172a;
+        border-radius: 10px;
+        padding: 10px 12px;
         text-align: left;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
+        display: block;
+      }
+      #sonder-context-chat-panel .sonder-history-item.is-clickable {
+        cursor: pointer;
+      }
+      #sonder-context-chat-panel .sonder-history-item.is-clickable:hover {
+        background: #f8fafc;
       }
       #sonder-context-chat-panel .sonder-history-item.is-active {
         border-color: #1d4ed8;
         background: rgba(29, 78, 216, 0.06);
       }
+      #sonder-context-chat-panel .sonder-history-item.is-clickable:focus-visible {
+        outline: 2px solid #93c5fd;
+        outline-offset: 1px;
+      }
       #sonder-context-chat-panel .sonder-history-item-title {
+        display: block;
+        margin-bottom: 4px;
         font-size: 13px;
         font-weight: 700;
       }
       #sonder-context-chat-panel .sonder-history-item-subtitle {
+        display: block;
         font-size: 12px;
+        line-height: 1.4;
         color: #64748b;
       }
       #sonder-context-chat-panel .sonder-message-list {
@@ -404,6 +438,28 @@ export class ContextChatPanel {
         background: rgba(29, 78, 216, 0.08);
         border-color: #93c5fd;
         color: #1d4ed8;
+      }
+      #sonder-context-chat-panel .sonder-text-action {
+        border: 1px solid #dbe2ea;
+        background: #fff;
+        color: #334155;
+        border-radius: 8px;
+        height: 28px;
+        padding: 0 8px;
+        font-size: 12px;
+        line-height: 1;
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      #sonder-context-chat-panel .sonder-text-action:hover {
+        background: #f8fafc;
+      }
+      #sonder-context-chat-panel .sonder-subtle-text {
+        font-size: 11px;
+        color: #64748b;
       }
       #sonder-context-chat-panel .sonder-message-content {
         font-size: 14px;
@@ -862,6 +918,7 @@ export class ContextChatPanel {
       this.state.loading = false;
       this.state.loadingPhase = undefined;
       this.state.snapshot = undefined;
+      this.state.insights = [];
       this.state.error = "Open a PDF or webpage snapshot, or select an annotation/note item, then click Chat. Other attachment types are not yet supported.";
       this.render();
       return;
@@ -871,6 +928,8 @@ export class ContextChatPanel {
       this.state.snapshot = itemPaperContext
         ? await this.store.getOrCreateItemPaperSession(itemPaperContext)
         : await this.store.getOrCreatePaperSession(paperContext!);
+      this.state.savedInsightsByMessage = {};
+      await this.refreshInsightsForCurrentContext();
       this.state.loading = false;
       this.state.loadingPhase = undefined;
       this.state.error = undefined;
@@ -879,6 +938,7 @@ export class ContextChatPanel {
       this.state.loading = false;
       this.state.loadingPhase = undefined;
       this.state.snapshot = undefined;
+      this.state.insights = [];
       this.state.error = String(error?.message || error || "Failed to open context session.");
       Zotero.logError(error);
     }
@@ -899,6 +959,8 @@ export class ContextChatPanel {
       const snapshot = await this.store.createNewSession(contextId);
       if (snapshot) {
         this.state.snapshot = snapshot;
+        this.state.savedInsightsByMessage = {};
+        await this.refreshInsightsForCurrentContext();
         this.syncPaperStatus();
       }
       this.state.historyOpen = false;
@@ -931,6 +993,8 @@ export class ContextChatPanel {
       const snapshot = await this.store.clearSessionMessages(sessionId);
       if (snapshot) {
         this.state.snapshot = snapshot;
+        this.state.savedInsightsByMessage = {};
+        await this.refreshInsightsForCurrentContext();
         this.syncPaperStatus();
       }
       this.state.historyOpen = false;
@@ -1105,6 +1169,8 @@ export class ContextChatPanel {
       const snapshot = await this.store.getSessionSnapshot(sessionId);
       if (snapshot) {
         this.state.snapshot = snapshot;
+        this.state.savedInsightsByMessage = {};
+        await this.refreshInsightsForCurrentContext();
         this.syncPaperStatus();
       }
       this.state.historyOpen = false;
@@ -1186,10 +1252,18 @@ export class ContextChatPanel {
     list.className = "sonder-history-list";
 
     snapshot.sessions.forEach((session) => {
-      const button = createHTML(doc, "button");
-      button.className = "sonder-history-item" + (session.id == snapshot.session.id ? " is-active" : "");
-      button.addEventListener("click", () => {
+      const item = createHTML(doc, "div");
+      item.className = "sonder-history-item is-clickable" + (session.id == snapshot.session.id ? " is-active" : "");
+      item.setAttribute("role", "button");
+      item.setAttribute("tabindex", "0");
+      item.addEventListener("click", () => {
         void this.loadSession(session.id);
+      });
+      item.addEventListener("keydown", (event) => {
+        if (event.key == "Enter" || event.key == " ") {
+          event.preventDefault();
+          void this.loadSession(session.id);
+        }
       });
 
       const title = createHTML(doc, "div");
@@ -1200,11 +1274,58 @@ export class ContextChatPanel {
       subtitle.className = "sonder-history-item-subtitle";
       subtitle.textContent = `Updated ${formatTimestamp(session.updatedAt)} · ${session.provider || "provider"}${session.model ? ` / ${session.model}` : ""}`;
 
-      button.append(title, subtitle);
-      list.appendChild(button);
+      item.append(title, subtitle);
+      list.appendChild(item);
     });
 
-    this.historyDrawer.append(meta, list);
+    const insightsMeta = createHTML(doc, "div");
+    insightsMeta.className = "sonder-history-meta";
+    insightsMeta.style.marginTop = "10px";
+    if (this.state.insightsLoading) {
+      insightsMeta.textContent = "Insights for this item: loading…";
+    } else {
+      insightsMeta.textContent = `Insights for this item: ${this.state.insights.length}`;
+    }
+
+    const insightsList = createHTML(doc, "div");
+    insightsList.className = "sonder-history-list";
+
+    if (!this.state.insightsLoading && this.state.insights.length == 0) {
+      const empty = createHTML(doc, "div");
+      empty.className = "sonder-history-item-subtitle";
+      empty.textContent = "No saved insights yet for this item.";
+      insightsList.appendChild(empty);
+    }
+
+    this.state.insights.forEach((insight) => {
+      const item = createHTML(doc, "div");
+      item.className = "sonder-history-item";
+
+      const title = createHTML(doc, "div");
+      title.className = "sonder-history-item-title";
+      title.textContent = insight.id;
+
+      const subtitle = createHTML(doc, "div");
+      subtitle.className = "sonder-history-item-subtitle";
+      subtitle.textContent = `${formatTimestamp(insight.createdAt)}${insight.annotationKey ? ` · annotation ${insight.annotationKey}` : ""}`;
+
+      const preview = createHTML(doc, "div");
+      preview.className = "sonder-history-item-subtitle";
+      preview.textContent = insight.content.slice(0, 140);
+
+      const openButton = createHTML(doc, "button");
+      openButton.className = "sonder-action";
+      openButton.style.marginTop = "6px";
+      openButton.textContent = "Open Session";
+      openButton.addEventListener("click", () => {
+        void this.loadSession(insight.sessionId);
+      });
+
+      item.append(title, subtitle, preview, openButton);
+      insightsList.appendChild(item);
+    });
+
+    this.historyDrawer.append(meta, list, insightsMeta, insightsList);
   }
 
   private async jumpToCitation(citation: { sourceType: "paper" | "item"; target?: string; page?: number; yOffset?: number }) {
@@ -1278,6 +1399,122 @@ export class ContextChatPanel {
     } catch (error: any) {
       Zotero.logError(error);
       this.ownerWindow.alert("Failed to copy message.");
+    }
+  }
+
+  private getInsightScopeForContext(context: SessionSnapshot["context"]) {
+    const itemKey = context.itemKey || context.paperKey;
+    return {
+      itemKey,
+      libraryID: context.libraryID,
+      annotationKey: context.type == "item+paper" && context.itemKind == "annotation" ? context.itemKey : undefined,
+    };
+  }
+
+  private async refreshInsightsForCurrentContext() {
+    const refreshSerial = ++this.insightRefreshSerial;
+    const context = this.state.snapshot?.context;
+    if (!context) {
+      this.state.insights = [];
+      this.state.insightsLoading = false;
+      this.render();
+      return;
+    }
+
+    const contextId = context.id;
+    const { itemKey, libraryID } = this.getInsightScopeForContext(context);
+    if (!itemKey) {
+      this.state.insights = [];
+      this.state.insightsLoading = false;
+      this.render();
+      return;
+    }
+
+    this.state.insightsLoading = true;
+    this.render();
+    try {
+      const insights = await this.store.listInsightsByItemKey(itemKey, libraryID);
+      if (refreshSerial != this.insightRefreshSerial || this.state.snapshot?.context.id != contextId) {
+        return;
+      }
+      this.state.insights = insights;
+    } catch (error: any) {
+      Zotero.logError(error);
+      if (refreshSerial != this.insightRefreshSerial || this.state.snapshot?.context.id != contextId) {
+        return;
+      }
+      this.state.insights = [];
+    } finally {
+      if (refreshSerial != this.insightRefreshSerial || this.state.snapshot?.context.id != contextId) {
+        return;
+      }
+      this.state.insightsLoading = false;
+      this.render();
+    }
+  }
+
+  private async saveInsightFromMessage(message: StoredMessage, button: HTMLButtonElement) {
+    const snapshot = this.state.snapshot;
+    if (!snapshot) {
+      return;
+    }
+
+    const existingInsightId = this.state.savedInsightsByMessage[message.id];
+    if (existingInsightId) {
+      this.ownerWindow.alert(`Already saved as ${existingInsightId}`);
+      return;
+    }
+
+    const context = snapshot.context;
+    const { itemKey, libraryID, annotationKey } = this.getInsightScopeForContext(context);
+    if (!itemKey) {
+      this.ownerWindow.alert("Unable to save insight: no item context is available.");
+      return;
+    }
+
+    try {
+      const insight = await this.store.createInsight({
+        itemKey,
+        libraryID,
+        annotationKey,
+        sessionId: snapshot.session.id,
+        messageId: message.id,
+        content: message.content,
+      });
+
+      let markerWriteFailed = false;
+      try {
+        await appendInsightMarkerForContext(context, insight.id);
+      } catch (markerError: any) {
+        markerWriteFailed = true;
+        Zotero.logError(markerError);
+      }
+
+      this.state.savedInsightsByMessage[message.id] = insight.id;
+      const currentSnapshot = this.state.snapshot;
+      const isSameSessionContext = Boolean(
+        currentSnapshot
+        && currentSnapshot.session.id == snapshot.session.id
+        && currentSnapshot.context.id == context.id,
+      );
+      if (!isSameSessionContext) {
+        return;
+      }
+
+      const previous = button.textContent;
+      button.textContent = "✓";
+      this.ownerWindow.setTimeout(() => {
+        button.textContent = previous;
+      }, 1200);
+      await this.refreshInsightsForCurrentContext();
+      this.render();
+
+      if (markerWriteFailed) {
+        this.ownerWindow.alert(`Insight saved as ${insight.id}, but failed to write Zotero marker.`);
+      }
+    } catch (error: any) {
+      Zotero.logError(error);
+      this.ownerWindow.alert(String(error?.message || error || "Failed to save insight."));
     }
   }
 
@@ -1447,7 +1684,22 @@ export class ContextChatPanel {
           void this.copyMessageContent(message.content, copyButton);
         });
 
-        footer.append(viewToggleButton, copyButton);
+        const saveInsightButton = createHTML(doc, "button");
+        saveInsightButton.className = "sonder-text-action";
+        saveInsightButton.textContent = "Save";
+        saveInsightButton.title = "Save insight";
+        saveInsightButton.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          void this.saveInsightFromMessage(message, saveInsightButton);
+        });
+
+        const savedInsightId = this.state.savedInsightsByMessage[message.id];
+        const savedLabel = createHTML(doc, "span");
+        savedLabel.className = "sonder-subtle-text";
+        savedLabel.textContent = savedInsightId ? `Saved insight: ${savedInsightId}` : "";
+
+        footer.append(viewToggleButton, copyButton, saveInsightButton, savedLabel);
         node.appendChild(footer);
       }
 

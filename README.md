@@ -131,7 +131,10 @@ Current behavior:
 - preview mode renders headings, lists, tables, code blocks, and math expressions after streaming completes
 - preview-mode math now supports `$...$`, `$$...$$`, `\(...\)`, and `\[...\]`
 - message output is selectable/copyable directly in the panel
-- each assistant message includes footer icon actions: view toggle (`👁` / `📝`) and copy (`⧉`) for raw markdown
+- each assistant message includes footer actions: view toggle (`👁` / `📝`), copy (`⧉`), and `Save insight` (`Save`)
+- `Save insight` stores long-form markdown insight content in Sonder SQLite (`insights` table), linked to item/session/message context
+- `History` drawer now includes `Insights for this item`; each insight row can reopen its source chat via `Open Session`
+- in `item+paper` mode, saving an insight also appends a lightweight source marker to Zotero annotation comment or note HTML: `→ Sonder insight [insight_id]`
 - raw markdown mode stays easy to copy into tools like Notion
 
 Current limitation:

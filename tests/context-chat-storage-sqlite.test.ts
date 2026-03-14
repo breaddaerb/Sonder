@@ -38,10 +38,22 @@ interface MessageRow {
   citations_json: string | null;
 }
 
+interface InsightRow {
+  id: string;
+  item_key: string;
+  library_id: number | null;
+  annotation_key: string | null;
+  session_id: string;
+  message_id: string | null;
+  content: string;
+  created_at: number;
+}
+
 class FakeSqliteConnection {
   public contexts = new Map<string, ContextRow>();
   public sessions = new Map<string, SessionRow>();
   public messages = new Map<string, MessageRow>();
+  public insights = new Map<string, InsightRow>();
 
   async executeTransaction(handler: () => Promise<void>) {
     await handler();
@@ -184,6 +196,55 @@ class FakeSqliteConnection {
       return Array.from(this.messages.values())
         .filter((row) => row.session_id == sessionId)
         .sort((a, b) => a.created_at - b.created_at);
+    }
+
+    if (q.startsWith("INSERT INTO INSIGHTS")) {
+      const [id, item_key, library_id, annotation_key, session_id, message_id, content, created_at] = params;
+      this.insights.set(String(id), {
+        id: String(id),
+        item_key: String(item_key),
+        library_id: library_id == null ? null : Number(library_id),
+        annotation_key: annotation_key == null ? null : String(annotation_key),
+        session_id: String(session_id),
+        message_id: message_id == null ? null : String(message_id),
+        content: String(content),
+        created_at: Number(created_at),
+      });
+      return [];
+    }
+
+    if (q.includes("FROM INSIGHTS WHERE ID = ?")) {
+      const id = String(params[0]);
+      const row = this.insights.get(id);
+      return row ? [row] : [];
+    }
+
+    if (q.includes("FROM INSIGHTS") && q.includes("WHERE ITEM_KEY = ?") && q.includes("ANNOTATION_KEY = ?") && q.includes("LIBRARY_ID = ?")) {
+      const [itemKey, annotationKey, libraryID] = params.map((v) => String(v));
+      return Array.from(this.insights.values())
+        .filter((row) => row.item_key == itemKey && (row.annotation_key || "") == annotationKey && String(row.library_id) == libraryID)
+        .sort((a, b) => b.created_at - a.created_at);
+    }
+
+    if (q.includes("FROM INSIGHTS") && q.includes("WHERE ITEM_KEY = ?") && q.includes("ANNOTATION_KEY = ?")) {
+      const [itemKey, annotationKey] = params.map((v) => String(v));
+      return Array.from(this.insights.values())
+        .filter((row) => row.item_key == itemKey && (row.annotation_key || "") == annotationKey)
+        .sort((a, b) => b.created_at - a.created_at);
+    }
+
+    if (q.includes("FROM INSIGHTS") && q.includes("WHERE ITEM_KEY = ?") && q.includes("LIBRARY_ID = ?")) {
+      const [itemKey, libraryID] = params.map((v) => String(v));
+      return Array.from(this.insights.values())
+        .filter((row) => row.item_key == itemKey && String(row.library_id) == libraryID)
+        .sort((a, b) => b.created_at - a.created_at);
+    }
+
+    if (q.includes("FROM INSIGHTS") && q.includes("WHERE ITEM_KEY = ?")) {
+      const [itemKey] = params.map((v) => String(v));
+      return Array.from(this.insights.values())
+        .filter((row) => row.item_key == itemKey)
+        .sort((a, b) => b.created_at - a.created_at);
     }
 
     throw new Error(`Unhandled SQL in test fake DB: ${sql}`);
@@ -340,6 +401,28 @@ async function main() {
 
   const newSession = await store.createNewSession(itemPaper.context.id);
   assert.ok(newSession, "Should create a new session for existing context");
+
+  const savedInsight = await store.createInsight({
+    itemKey: "ITEM-1",
+    libraryID: 1,
+    annotationKey: "ITEM-1",
+    sessionId: itemPaper.session.id,
+    messageId: "message-x",
+    content: "Key observation from chat.",
+    createdAt: 3000,
+  });
+  assert.match(savedInsight.id, /^insight:/);
+
+  const foundInsight = await store.getInsightById(savedInsight.id);
+  assert.equal(foundInsight?.content, "Key observation from chat.");
+
+  const insightsByItem = await store.listInsightsByItemKey("ITEM-1", 1);
+  assert.equal(insightsByItem.length, 1);
+  assert.equal(insightsByItem[0].id, savedInsight.id);
+
+  const insightsByAnno = await store.listInsightsByItemAndAnnotation("ITEM-1", "ITEM-1", 1);
+  assert.equal(insightsByAnno.length, 1);
+  assert.equal(insightsByAnno[0].messageId, "message-x");
 
   console.log("context-chat sqlite storage tests passed");
 }
