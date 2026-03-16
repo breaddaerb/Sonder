@@ -129,6 +129,16 @@ class FakeSqliteConnection {
       return [];
     }
 
+    if (q.startsWith("UPDATE SESSIONS SET TITLE = ?, UPDATED_AT = ?")) {
+      const [title, updatedAt, id] = params;
+      const row = this.sessions.get(String(id));
+      if (row) {
+        row.title = String(title);
+        row.updated_at = Number(updatedAt);
+      }
+      return [];
+    }
+
     if (q.startsWith("UPDATE SESSIONS SET UPDATED_AT = ?")) {
       const [updatedAt, provider, model, id] = params;
       const row = this.sessions.get(String(id));
@@ -136,6 +146,22 @@ class FakeSqliteConnection {
         row.updated_at = Number(updatedAt);
         row.provider = provider == null ? null : String(provider);
         row.model = model == null ? null : String(model);
+      }
+      return [];
+    }
+
+    if (q.startsWith("DELETE FROM SESSIONS WHERE ID = ?")) {
+      const id = String(params[0]);
+      this.sessions.delete(id);
+      for (const [messageId, message] of this.messages.entries()) {
+        if (message.session_id == id) {
+          this.messages.delete(messageId);
+        }
+      }
+      for (const [insightId, insight] of this.insights.entries()) {
+        if (insight.session_id == id) {
+          this.insights.delete(insightId);
+        }
       }
       return [];
     }
@@ -401,6 +427,27 @@ async function main() {
 
   const newSession = await store.createNewSession(itemPaper.context.id);
   assert.ok(newSession, "Should create a new session for existing context");
+
+  const renamed = await store.renameSession(itemPaper.session.id, "Focused Session");
+  assert.equal(renamed?.title, "Focused Session");
+  const renamedSnapshot = await store.getSessionSnapshot(itemPaper.session.id);
+  assert.equal(renamedSnapshot?.session.title, "Focused Session");
+
+  await store.appendMessage(newSession!.session.id, "user", "to be deleted", { createdAt: 2500 });
+  const doomedInsight = await store.createInsight({
+    itemKey: "ITEM-1",
+    libraryID: 1,
+    sessionId: newSession!.session.id,
+    content: "linked to deleted session",
+    createdAt: 2550,
+  });
+
+  const deleted = await store.deleteSession(newSession!.session.id);
+  assert.equal(deleted?.sessionId, newSession!.session.id);
+  const deletedSnapshot = await store.getSessionSnapshot(newSession!.session.id);
+  assert.equal(deletedSnapshot, undefined);
+  assert.equal(Array.from(fakeDb.messages.values()).some((m) => m.session_id == newSession!.session.id), false);
+  assert.equal(Array.from(fakeDb.insights.values()).some((i) => i.id == doomedInsight.id), false);
 
   const savedInsight = await store.createInsight({
     itemKey: "ITEM-1",
