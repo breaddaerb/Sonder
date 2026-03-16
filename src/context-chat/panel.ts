@@ -3,7 +3,7 @@ import { canSendDraft } from "./chatMessages";
 import { resolveSelectedItemPaperContextWithSource } from "./itemPaperContext";
 import { resolveCurrentPaperContext } from "./paperContext";
 import { clearCodexLogin, finishCodexOAuthLogin, getCodexLoginReport, startCodexOAuthLogin } from "../modules/Meet/CodexOAuth";
-import { getCurrentModel, getProvider, hasCodexCredentials, setProvider, getCustomApiConfig, setCustomApiConfig, hasCustomApiConfig, clearCustomApiConfig, getCustomApiStatusLabel } from "../modules/provider";
+import { CODEX_MODELS, getCurrentModel, getProvider, hasCodexCredentials, setCurrentModel, setProvider, getCustomApiConfig, setCustomApiConfig, hasCustomApiConfig, clearCustomApiConfig, getCustomApiStatusLabel } from "../modules/provider";
 import { testCustomApiConnection } from "../modules/Meet/OpenAI";
 import { renderMessageHTML } from "./render";
 import ContextChatStore from "./storage";
@@ -57,6 +57,7 @@ export class ContextChatPanel {
   private newSessionButton!: HTMLButtonElement;
   private clearSessionButton!: HTMLButtonElement;
   private codexAuthButton!: HTMLButtonElement;
+  private codexModelButton!: HTMLButtonElement;
   private customApiButton!: HTMLButtonElement;
   private pageRangeButton!: HTMLButtonElement;
   private closeButton!: HTMLButtonElement;
@@ -236,8 +237,9 @@ export class ContextChatPanel {
       }
       #sonder-context-chat-panel .sonder-header-actions {
         display: flex;
-        align-items: center;
-        gap: 10px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
       }
       #sonder-context-chat-panel .sonder-action-group {
         display: inline-flex;
@@ -248,8 +250,8 @@ export class ContextChatPanel {
         background: #f8fafc;
         border: 1px solid #e2e8f0;
       }
-      #sonder-context-chat-panel .sonder-header-spacer {
-        flex: 1;
+      #sonder-context-chat-panel .sonder-action-group.is-provider-row {
+        margin-left: 0;
       }
       #sonder-context-chat-panel .sonder-action,
       #sonder-context-chat-panel .sonder-close,
@@ -768,7 +770,7 @@ export class ContextChatPanel {
     sessionGroup.append(historyButton, newSessionButton, clearSessionButton, pageRangeButton);
 
     const providerGroup = createHTML(doc, "div");
-    providerGroup.className = "sonder-action-group";
+    providerGroup.className = "sonder-action-group is-provider-row";
 
     const codexAuthButton = createHTML(doc, "button");
     codexAuthButton.className = "sonder-action";
@@ -776,15 +778,18 @@ export class ContextChatPanel {
       void this.handleCodexAuth();
     });
 
+    const codexModelButton = createHTML(doc, "button");
+    codexModelButton.className = "sonder-action";
+    codexModelButton.addEventListener("click", () => {
+      void this.handleCodexModelConfig();
+    });
+
     const customApiButton = createHTML(doc, "button");
     customApiButton.className = "sonder-action";
     customApiButton.addEventListener("click", () => {
       void this.handleCustomApiConfig();
     });
-    providerGroup.append(codexAuthButton, customApiButton);
-
-    const spacer = createHTML(doc, "div");
-    spacer.className = "sonder-header-spacer";
+    providerGroup.append(codexAuthButton, codexModelButton, customApiButton);
 
     const closeButton = createHTML(doc, "button");
     closeButton.className = "sonder-close";
@@ -796,7 +801,7 @@ export class ContextChatPanel {
       this.render();
     });
 
-    actionRow.append(sessionGroup, providerGroup, spacer);
+    actionRow.append(sessionGroup, providerGroup);
 
     const historyDrawer = createHTML(doc, "div");
     historyDrawer.className = "sonder-history-drawer";
@@ -856,6 +861,7 @@ export class ContextChatPanel {
     this.newSessionButton = newSessionButton;
     this.clearSessionButton = clearSessionButton;
     this.codexAuthButton = codexAuthButton;
+    this.codexModelButton = codexModelButton;
     this.customApiButton = customApiButton;
     this.pageRangeButton = pageRangeButton;
     this.closeButton = closeButton;
@@ -1116,6 +1122,34 @@ export class ContextChatPanel {
       this.render();
     } catch (error: any) {
       this.ownerWindow.alert(String(error?.message || error || "Codex auth failed."));
+      this.render();
+    }
+  }
+
+  private async handleCodexModelConfig() {
+    try {
+      if (getProvider() != "openai-codex") {
+        return;
+      }
+      const current = getCurrentModel("openai-codex");
+      const options = CODEX_MODELS.join(", ");
+      const next = this.ownerWindow.prompt(
+        `Current Codex model: ${current}\n\nAvailable models:\n${options}\n\nEnter model name:`,
+        current,
+      );
+      if (next === null) {
+        return;
+      }
+      const trimmed = next.trim();
+      if (!trimmed) {
+        this.ownerWindow.alert("Model cannot be empty.");
+        return;
+      }
+      setCurrentModel(trimmed, "openai-codex");
+      this.ownerWindow.alert(`Codex model set to: ${trimmed}`);
+      this.render();
+    } catch (error: any) {
+      this.ownerWindow.alert(String(error?.message || error || "Failed to set Codex model."));
       this.render();
     }
   }
@@ -2192,6 +2226,12 @@ export class ContextChatPanel {
       this.codexAuthButton.textContent = "Login Codex";
       this.codexAuthButton.title = "Start ChatGPT/Codex OAuth login";
     }
+
+    this.codexModelButton.disabled = this.state.loading || provider != "openai-codex";
+    this.codexModelButton.style.display = provider == "openai-codex" ? "" : "none";
+    this.codexModelButton.textContent = `Codex: ${getCurrentModel("openai-codex")}`;
+    this.codexModelButton.title = "Change Codex model";
+    this.codexModelButton.classList.toggle("is-active", provider == "openai-codex");
 
     this.customApiButton.disabled = this.state.loading;
     const apiLabel = getCustomApiStatusLabel();

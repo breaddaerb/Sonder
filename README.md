@@ -76,6 +76,7 @@ Uses ChatGPT/Codex via browser-based OAuth login. No API key required.
 1. Click `Login Codex` in the panel header (or `Enable Codex` if not yet on the Codex provider)
 2. Complete the browser login flow
 3. Paste the redirect URL back when prompted
+4. After login, click `Codex: {model}` in header to switch OAuth model (e.g., `gpt-5.4`)
 
 See [`docs/codex-oauth.md`](docs/codex-oauth.md) for details.
 
@@ -137,6 +138,30 @@ Current behavior:
 - `History` drawer now includes `Insights for this item`; each insight row can reopen its source chat via `Open Session`
 - in `item+paper` mode, saving an insight also appends a lightweight source marker to Zotero annotation comment or note HTML: `→ Sonder insight [insight_id]`
 - raw markdown mode stays easy to copy into tools like Notion
+
+### Prompt tuning (where to edit)
+
+If you want to tweak model behavior/answer quality, edit these files:
+
+- `src/context-chat/paperRetrieval.ts`
+  - `buildPaperGroundedUserMessage(...)`
+  - `buildItemPaperGroundedUserMessage(...)`
+  - These are the main grounding prompt templates for paper mode and item+paper mode.
+- `src/context-chat/chatService.ts`
+  - `sendMessage(...)` decides what paper context is injected (all pages vs selected page range) before sending to provider.
+
+### Codex OAuth model list (where to edit)
+
+If you want to add/remove available Codex models for OAuth-based chat:
+
+- Edit `src/modules/provider.ts`
+  - `CODEX_MODELS` controls the allowed/known Codex model list
+  - `getCurrentModel("openai-codex")` reads the selected model from pref key `sonder.codexModel`
+
+Note:
+
+- Sonder currently injects grounding instructions into the latest **user** message (not a separate persistent system message).
+- If you change citation instruction format, also check `parseCitedIndices(...)` in `src/context-chat/paperRetrieval.ts` so citation chips still parse correctly.
 
 Current limitation:
 
