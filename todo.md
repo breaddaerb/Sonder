@@ -250,21 +250,25 @@ Main direction: large right-side docked chat panel.
 
 User promise: when opening chat from a PDF, they can ask about the whole paper.
 
-- [ ] Reuse/clean up existing PDF parsing pipeline
+- [x] Reuse/clean up existing PDF parsing pipeline
 - [x] Parse current PDF into chunks/documents
 - [x] Add clear preparation lifecycle
   - [x] preparing
   - [x] ready
   - [ ] stale
   - [x] failed
-- [x] Retrieve relevant chunks per question
-- [ ] Keep source metadata for citation jumping
+- [x] Switch from retrieval-based (top-5 chunks) to full-paper context delivery
+- [x] Use page-level chunking (one chunk per page) instead of sub-page chunks
+- [x] Send all pages to the model by default (modern models support 128k-200k+ tokens)
+- [x] Add optional page-range filter for users to exclude irrelevant sections
+- [x] Keep source metadata for citation jumping (topY/bottomY preserved per page chunk)
 - [x] Avoid exposing old `AskPDF`-style hidden behavior as the primary model
 
-### 7.1 Retrieval strategy
-- [x] Decide what is V1 retrieval for `openai-api`
-- [x] Decide what is V1 retrieval for `openai-codex`
-- [x] Ensure product semantics stay stable even if retrieval internals differ
+### 7.1 Context delivery strategy
+- [x] Full-paper context for `openai-api` (all pages sent)
+- [x] Full-paper context for `openai-codex` (all pages sent)
+- [x] Optional page-range filtering via panel UI
+- [x] Ensure product semantics stay stable even if context delivery internals differ
 
 ---
 
@@ -403,10 +407,11 @@ A core value of paper chat is being able to jump back to source.
 - [x] Preserve existing source-jump capability where possible
 - [x] Design citation chip format in the new panel
 - [x] Clicking a citation should:
-  - [x] jump to PDF region for paper chunks
+  - [x] jump to PDF region for paper chunks (page-level with y-offset)
   - [x] jump to a finer-grained paragraph/box region instead of page-level only
   - [ ] visually highlight/mark the relevant cited content after jump
   - [x] select Zotero item for item sources where appropriate
+  - [x] each citation chip maps to a full page in full-paper context mode
 - [x] Make citations visible but not visually noisy
 
 ---

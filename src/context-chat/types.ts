@@ -1,5 +1,11 @@
 export type ContextType = "paper" | "item+paper";
 
+/** Optional page range for filtering which pages of a paper are sent to the model. */
+export interface PageRange {
+  startPage: number;
+  endPage: number;
+}
+
 export interface Citation {
   id: string;
   label: string;

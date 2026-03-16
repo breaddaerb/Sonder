@@ -1,4 +1,4 @@
-import { Citation } from "./types";
+import { Citation, PageRange } from "./types";
 import { isSnapshotAttachment } from "./paperContext";
 
 export interface PaperChunk {
@@ -181,36 +181,59 @@ function chunkLinesWithPosition(lines: PositionedLine[], page: number, maxChars:
   return chunks;
 }
 
-function fallbackQueryTokens(queryText: string) {
-  const tokens = (queryText.toLowerCase().match(/[a-z0-9]{2,}|[\u4e00-\u9fff]{1,8}/g) || [])
-    .map((token) => token.trim())
-    .filter(Boolean);
-  return [...new Set(tokens)];
-}
-
-function scoreChunk(queryText: string, chunk: PaperChunk) {
-  const text = chunk.content.toLowerCase();
-  const query = queryText.toLowerCase().trim();
-  const tokens = fallbackQueryTokens(queryText);
-  let score = 0;
-  if (query.length > 0 && text.indexOf(query) >= 0) {
-    score += 120;
+/**
+ * Build a single page-level chunk from positioned lines.
+ * Aggregates all text on the page into one chunk, preserving the y-coordinates
+ * of the first and last lines for citation scroll positioning.
+ */
+export function chunkByPage(lines: PositionedLine[], page: number): PaperChunk | null {
+  const nonEmptyLines = lines.filter((line) => normalizeText(line.text).length > 0);
+  if (nonEmptyLines.length === 0) {
+    return null;
   }
-  tokens.forEach((token) => {
-    const matches = text.split(token).length - 1;
-    score += Math.min(matches, 6) * Math.max(1, token.length / 2);
-  });
-  score += Math.min(chunk.content.length / 500, 6);
-  return score;
+  const content = nonEmptyLines.map((line) => normalizeText(line.text)).join(" ");
+  const normalized = normalizeText(content);
+  if (!normalized) {
+    return null;
+  }
+  return {
+    id: `p${page}-c1`,
+    page,
+    label: `p.${page}`,
+    content: normalized,
+    topY: nonEmptyLines[0].y,
+    bottomY: nonEmptyLines[nonEmptyLines.length - 1].y,
+  };
 }
 
-export function selectRelevantPaperChunks(queryText: string, chunks: PaperChunk[], maxChunks: number = 5) {
-  return [...chunks]
-    .map((chunk) => ({ chunk, score: scoreChunk(queryText, chunk) }))
-    .sort((a, b) => b.score - a.score || a.chunk.page - b.chunk.page)
-    .slice(0, maxChunks)
-    .map((entry) => entry.chunk)
-    .sort((a, b) => a.page - b.page || a.id.localeCompare(b.id));
+/**
+ * Build a single page-level chunk from plain text (no y-coordinates).
+ * Used for snapshot attachments where positional data is unavailable.
+ */
+export function chunkByPageFromText(text: string, page: number): PaperChunk | null {
+  const normalized = normalizeText(text);
+  if (!normalized) {
+    return null;
+  }
+  return {
+    id: `p${page}-c1`,
+    page,
+    label: `p.${page}`,
+    content: normalized,
+  };
+}
+
+/**
+ * Filter chunks to only include pages within the given range (inclusive).
+ * If no range is provided, returns all chunks unchanged.
+ */
+export function filterChunksByPageRange(chunks: PaperChunk[], pageRange?: PageRange): PaperChunk[] {
+  if (!pageRange) {
+    return chunks;
+  }
+  return chunks.filter(
+    (chunk) => chunk.page >= pageRange.startPage && chunk.page <= pageRange.endPage,
+  );
 }
 
 /**
@@ -269,18 +292,17 @@ export function buildPaperGroundedUserMessage(args: {
 }) {
   const contextText = args.chunks.length > 0
     ? args.chunks.map((chunk, index) => `[${index + 1}] (${chunk.label}) ${chunk.content}`).join("\n\n")
-    : "(No paper chunks were retrieved.)";
+    : "(No paper content was extracted.)";
   return [
     `You are helping the user chat with the paper titled: ${args.title}`,
-    "Use the retrieved paper context below as your primary grounding for factual claims about the paper.",
-    "If the retrieved context is insufficient, say so briefly and then answer carefully.",
-    "When referring to retrieved context, cite chunk numbers like [1] or [2].",
+    "The complete paper text is provided below (one section per page). Use it as your primary grounding for factual claims about the paper.",
+    "When referring to specific parts of the paper, cite page numbers like [1] or [2] (these correspond to the numbered sections below).",
     "Format the answer in clean markdown that stays easy to read and easy to copy into tools like Notion.",
     "Use headings/lists/tables when helpful. Use fenced code blocks for code.",
-    "For math, prefer standard markdown math delimiters: use $...$ for inline equations and $$...$$ for standalone block equations.",
+    "For math, prefer standard markdown math delimiters: use $...$ for inline equations and $...$ for standalone block equations.",
     "Avoid mixing prose and bare un-delimited LaTeX when proper math delimiters can be used.",
     "",
-    "Retrieved paper context:",
+    "Full paper content:",
     contextText,
     "",
     `User question: ${args.question}`,
@@ -296,21 +318,21 @@ export function buildItemPaperGroundedUserMessage(args: {
 }) {
   const contextText = args.chunks.length > 0
     ? args.chunks.map((chunk, index) => `[${index + 1}] (${chunk.label}) ${chunk.content}`).join("\n\n")
-    : "(No paper chunks were retrieved.)";
+    : "(No paper content was extracted.)";
   const itemLabel = args.itemKind == "annotation" ? "Selected annotation" : "Selected note";
   return [
     `You are helping the user chat with a selected ${args.itemKind} from the paper titled: ${args.paperTitle}`,
     `${itemLabel} (must be treated as primary anchor):`,
     args.itemText,
     "",
-    "Always address the selected item directly first, then use paper context as supplementary evidence.",
+    "Always address the selected item directly first, then use the full paper content as supplementary evidence.",
     "The selected item content is mandatory context and must never be ignored.",
-    "When referring to retrieved paper context, cite chunk numbers like [1] or [2].",
+    "When referring to specific parts of the paper, cite page numbers like [1] or [2] (these correspond to the numbered sections below).",
     "Format the answer in clean markdown that stays easy to read and easy to copy into tools like Notion.",
     "Use headings/lists/tables when helpful. Use fenced code blocks for code.",
-    "For math, prefer standard markdown math delimiters: use $...$ for inline equations and $$...$$ for standalone block equations.",
+    "For math, prefer standard markdown math delimiters: use $...$ for inline equations and $...$ for standalone block equations.",
     "",
-    "Supplementary paper context:",
+    "Full paper content:",
     contextText,
     "",
     `User question: ${args.question}`,
@@ -477,8 +499,9 @@ async function readSnapshotChunks(
     text = extractSnapshotTextFromDom(reader._iframeWindow);
   }
 
-  // Chunk whatever text we got (may be empty — that's OK, status will be "ready")
-  const chunks = text ? chunkText(text, 1) : [];
+  // Build a single page-level chunk from the extracted text (snapshots have no page structure).
+  const pageChunk = text ? chunkByPageFromText(text, 1) : null;
+  const chunks = pageChunk ? [pageChunk] : [];
 
   return {
     contextId,
@@ -510,13 +533,15 @@ async function readPdfChunks(
     const items = (textContent.items as PDFItem[]).filter((item) => item.str?.trim().length);
     const lines = mergeSameLine(items);
 
-    // Build positioned lines for fine-grained chunk y-coordinates.
-    // PDFLine.y is in PDF coordinate space (origin bottom-left, y increases upward).
+    // Build positioned lines and produce one page-level chunk.
     const positionedLines: PositionedLine[] = lines.map((line) => ({
       text: line.text,
       y: line.y,
     }));
-    chunks.push(...chunkLinesWithPosition(positionedLines, pageIndex + 1));
+    const pageChunk = chunkByPage(positionedLines, pageIndex + 1);
+    if (pageChunk) {
+      chunks.push(pageChunk);
+    }
   }
 
   return {

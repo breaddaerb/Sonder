@@ -3,9 +3,11 @@ import { canSendDraft, toChatHistory } from "../src/context-chat/chatMessages";
 import {
   buildItemPaperGroundedUserMessage,
   buildPaperGroundedUserMessage,
+  chunkByPage,
+  chunkByPageFromText,
   createPaperChunkCitations,
+  filterChunksByPageRange,
   parseCitedIndices,
-  selectRelevantPaperChunks,
 } from "../src/context-chat/paperRetrieval";
 import { renderMessageHTML } from "../src/context-chat/render";
 import {
@@ -50,41 +52,88 @@ assert.deepEqual(
   ]
 );
 
-const relevantChunks = selectRelevantPaperChunks("transformer attention", [
-  { id: "c1", page: 1, label: "p.1", content: "This paper studies convolutional baselines for vision tasks." },
-  { id: "c2", page: 2, label: "p.2", content: "We explain transformer attention and multi-head attention in detail." },
-  { id: "c3", page: 3, label: "p.3", content: "Results and ablations are reported for sequence modeling." },
-]);
-assert.equal(relevantChunks.some((chunk) => chunk.id == "c2"), true);
+// --- chunkByPage tests ---
+const pageChunk = chunkByPage(
+  [
+    { text: "First line", y: 700 },
+    { text: "Second line", y: 680 },
+  ],
+  1,
+);
+assert.ok(pageChunk, "chunkByPage should return a chunk for non-empty lines");
+assert.equal(pageChunk!.id, "p1-c1");
+assert.equal(pageChunk!.page, 1);
+assert.equal(pageChunk!.label, "p.1");
+assert.match(pageChunk!.content, /First line/);
+assert.match(pageChunk!.content, /Second line/);
+assert.equal(pageChunk!.topY, 700);
+assert.equal(pageChunk!.bottomY, 680);
 
-const citations = createPaperChunkCitations(relevantChunks);
+const emptyPageChunk = chunkByPage([], 5);
+assert.equal(emptyPageChunk, null, "chunkByPage should return null for empty lines");
+
+// --- chunkByPageFromText tests ---
+const textChunk = chunkByPageFromText("Hello world\nSecond paragraph", 3);
+assert.ok(textChunk, "chunkByPageFromText should return a chunk for non-empty text");
+assert.equal(textChunk!.id, "p3-c1");
+assert.equal(textChunk!.page, 3);
+assert.equal(textChunk!.label, "p.3");
+assert.match(textChunk!.content, /Hello world/);
+assert.match(textChunk!.content, /Second paragraph/);
+
+const emptyTextChunk = chunkByPageFromText("   \n  ", 1);
+assert.equal(emptyTextChunk, null, "chunkByPageFromText should return null for whitespace-only text");
+
+// --- filterChunksByPageRange tests ---
+const allChunks = [
+  { id: "c1", page: 1, label: "p.1", content: "Page 1 content" },
+  { id: "c2", page: 2, label: "p.2", content: "Page 2 content" },
+  { id: "c3", page: 3, label: "p.3", content: "Page 3 content" },
+  { id: "c4", page: 4, label: "p.4", content: "Page 4 content" },
+  { id: "c5", page: 5, label: "p.5", content: "Page 5 content" },
+];
+// No range — returns all
+assert.equal(filterChunksByPageRange(allChunks).length, 5);
+assert.equal(filterChunksByPageRange(allChunks, undefined).length, 5);
+// Range 2-4
+const filtered = filterChunksByPageRange(allChunks, { startPage: 2, endPage: 4 });
+assert.equal(filtered.length, 3);
+assert.deepEqual(filtered.map((c) => c.page), [2, 3, 4]);
+// Range 1-1 (single page)
+assert.equal(filterChunksByPageRange(allChunks, { startPage: 1, endPage: 1 }).length, 1);
+// Range beyond available pages
+assert.equal(filterChunksByPageRange(allChunks, { startPage: 10, endPage: 20 }).length, 0);
+
+// --- createPaperChunkCitations tests ---
+const citations = createPaperChunkCitations(allChunks);
 assert.equal(citations[0].sourceType, "paper");
 assert.equal(typeof citations[0].page, "number");
 assert.match(citations[0].target || "", /^page:/);
 
+// --- buildPaperGroundedUserMessage tests ---
 const groundedPrompt = buildPaperGroundedUserMessage({
   title: "Attention Paper",
   question: "What does the paper say about attention?",
-  chunks: relevantChunks,
+  chunks: allChunks.slice(0, 3),
 });
-assert.match(groundedPrompt, /Retrieved paper context:/);
+assert.match(groundedPrompt, /Full paper content:/);
 assert.match(groundedPrompt, /markdown/);
 assert.match(groundedPrompt, /fenced code blocks/);
 assert.match(groundedPrompt, /\$\.\.\.\$/);
-assert.match(groundedPrompt, /\$\$\.\.\.\$\$/);
 assert.match(groundedPrompt, /p\.2/);
 assert.match(groundedPrompt, /User question:/);
 
+// --- buildItemPaperGroundedUserMessage tests ---
 const itemGroundedPrompt = buildItemPaperGroundedUserMessage({
   paperTitle: "Attention Paper",
   itemKind: "annotation",
   itemText: "Selected highlighted sentence.",
   question: "What does this sentence imply?",
-  chunks: relevantChunks,
+  chunks: allChunks.slice(0, 3),
 });
 assert.match(itemGroundedPrompt, /Selected annotation/);
 assert.match(itemGroundedPrompt, /must never be ignored/);
-assert.match(itemGroundedPrompt, /Supplementary paper context/);
+assert.match(itemGroundedPrompt, /Full paper content:/);
 
 const renderedHTML = renderMessageHTML([
   "# Heading",

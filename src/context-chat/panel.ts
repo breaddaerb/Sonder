@@ -8,7 +8,7 @@ import { testCustomApiConnection } from "../modules/Meet/OpenAI";
 import { renderMessageHTML } from "./render";
 import ContextChatStore from "./storage";
 import { appendInsightMarkerForContext } from "./insightMarker";
-import { SessionSnapshot, StoredInsight, StoredMessage } from "./types";
+import { PageRange, SessionSnapshot, StoredInsight, StoredMessage } from "./types";
 
 const HTML_NS = "http://www.w3.org/1999/xhtml";
 
@@ -58,6 +58,7 @@ export class ContextChatPanel {
   private clearSessionButton!: HTMLButtonElement;
   private codexAuthButton!: HTMLButtonElement;
   private customApiButton!: HTMLButtonElement;
+  private pageRangeButton!: HTMLButtonElement;
   private closeButton!: HTMLButtonElement;
   private historyDrawer!: HTMLDivElement;
   private messageList!: HTMLDivElement;
@@ -79,6 +80,7 @@ export class ContextChatPanel {
     snapshot?: SessionSnapshot;
     error?: string;
     panelWidth?: number;
+    pageRange?: PageRange;
     savedInsightsByMessage: Record<string, string>;
     insights: StoredInsight[];
     insightsLoading: boolean;
@@ -715,7 +717,13 @@ export class ContextChatPanel {
     clearSessionButton.addEventListener("click", () => {
       void this.clearCurrentSession();
     });
-    sessionGroup.append(historyButton, newSessionButton, clearSessionButton);
+    const pageRangeButton = createHTML(doc, "button");
+    pageRangeButton.className = "sonder-action";
+    pageRangeButton.addEventListener("click", () => {
+      this.handlePageRangeConfig();
+    });
+
+    sessionGroup.append(historyButton, newSessionButton, clearSessionButton, pageRangeButton);
 
     const providerGroup = createHTML(doc, "div");
     providerGroup.className = "sonder-action-group";
@@ -807,6 +815,7 @@ export class ContextChatPanel {
     this.clearSessionButton = clearSessionButton;
     this.codexAuthButton = codexAuthButton;
     this.customApiButton = customApiButton;
+    this.pageRangeButton = pageRangeButton;
     this.closeButton = closeButton;
     this.historyDrawer = historyDrawer;
     this.messageList = messageList;
@@ -1188,6 +1197,59 @@ export class ContextChatPanel {
     }
   }
 
+  private handlePageRangeConfig() {
+    if (this.state.pageRange) {
+      // Currently has a page range set — offer to clear it or change it
+      const input = this.ownerWindow.prompt(
+        `Current page range: ${this.state.pageRange.startPage}-${this.state.pageRange.endPage}\n\nEnter a new page range (e.g., "1-8") or leave empty to send all pages:`,
+        `${this.state.pageRange.startPage}-${this.state.pageRange.endPage}`,
+      );
+      if (input === null) {
+        return; // cancelled
+      }
+      const trimmed = input.trim();
+      if (!trimmed) {
+        this.state.pageRange = undefined;
+        this.render();
+        return;
+      }
+      const match = trimmed.match(/^(\d+)\s*[-–]\s*(\d+)$/);
+      if (!match) {
+        this.ownerWindow.alert('Invalid format. Use "start-end" (e.g., "1-8").');
+        return;
+      }
+      const startPage = Number(match[1]);
+      const endPage = Number(match[2]);
+      if (startPage < 1 || endPage < startPage) {
+        this.ownerWindow.alert("Invalid range. Start page must be >= 1 and end page must be >= start page.");
+        return;
+      }
+      this.state.pageRange = { startPage, endPage };
+      this.render();
+    } else {
+      // No page range set — offer to set one
+      const input = this.ownerWindow.prompt(
+        'All pages are sent to the model by default.\n\nTo limit context to specific pages (e.g., exclude references), enter a page range like "1-8".\nLeave empty to keep sending all pages:',
+      );
+      if (input === null || !input.trim()) {
+        return; // cancelled or empty — keep all pages
+      }
+      const match = input.trim().match(/^(\d+)\s*[-–]\s*(\d+)$/);
+      if (!match) {
+        this.ownerWindow.alert('Invalid format. Use "start-end" (e.g., "1-8").');
+        return;
+      }
+      const startPage = Number(match[1]);
+      const endPage = Number(match[2]);
+      if (startPage < 1 || endPage < startPage) {
+        this.ownerWindow.alert("Invalid range. Start page must be >= 1 and end page must be >= start page.");
+        return;
+      }
+      this.state.pageRange = { startPage, endPage };
+      this.render();
+    }
+  }
+
   private async handleSend() {
     const snapshot = this.state.snapshot;
     const content = this.state.draft.trim();
@@ -1216,7 +1278,7 @@ export class ContextChatPanel {
           this.setPaperStatus(state.status, state.error);
           this.render();
         },
-      });
+      }, this.state.pageRange);
       this.state.snapshot = nextSnapshot;
       this.state.assistantPreviewText = "";
     } catch (error: any) {
@@ -1840,6 +1902,15 @@ export class ContextChatPanel {
       ? "Reconfigure or clear the custom API endpoint"
       : "Configure a custom OpenAI-compatible API endpoint (base URL + API key + model)";
     this.customApiButton.classList.toggle("is-active", provider == "openai-api" && hasCustomApiConfig());
+
+    this.pageRangeButton.disabled = !hasContext || this.state.loading;
+    this.pageRangeButton.textContent = this.state.pageRange
+      ? `Pages: ${this.state.pageRange.startPage}-${this.state.pageRange.endPage}`
+      : "Pages: All";
+    this.pageRangeButton.title = this.state.pageRange
+      ? `Sending pages ${this.state.pageRange.startPage}-${this.state.pageRange.endPage} to the model. Click to change or reset.`
+      : "Sending all pages to the model. Click to set a page range.";
+    this.pageRangeButton.classList.toggle("is-active", Boolean(this.state.pageRange));
 
     this.closeButton.disabled = false;
 

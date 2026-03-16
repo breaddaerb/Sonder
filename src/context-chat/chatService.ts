@@ -6,12 +6,12 @@ import {
   buildItemPaperGroundedUserMessage,
   buildPaperGroundedUserMessage,
   createPaperChunkCitations,
+  filterChunksByPageRange,
   parseCitedIndices,
   PreparedPaperContext,
   readCurrentReaderPaperChunks,
-  selectRelevantPaperChunks,
 } from "./paperRetrieval";
-import { Citation, SessionSnapshot, StoredContext } from "./types";
+import { Citation, PageRange, SessionSnapshot, StoredContext } from "./types";
 
 export type PaperContextStatus = "idle" | "preparing" | "ready" | "failed";
 
@@ -136,7 +136,8 @@ export class ContextChatService {
   public async sendMessage(
     sessionId: string,
     content: string,
-    callbacks: SendMessageCallbacks = {}
+    callbacks: SendMessageCallbacks = {},
+    pageRange?: PageRange,
   ): Promise<SessionSnapshot> {
     const provider = getProvider();
     const model = getCurrentModel(provider);
@@ -160,19 +161,20 @@ export class ContextChatService {
       };
     }
 
-    const relevantChunks = selectRelevantPaperChunks(content, preparedPaper.chunks);
+    // Send all paper chunks (one per page), optionally filtered by user-specified page range.
+    const contextChunks = filterChunksByPageRange(preparedPaper.chunks, pageRange);
     const groundedUserMessage = snapshot.context.type == "item+paper"
       ? buildItemPaperGroundedUserMessage({
           paperTitle: preparedPaper.title,
           itemKind: snapshot.context.itemKind || "annotation",
           itemText: snapshot.context.itemText || "(Selected item content unavailable)",
           question: content,
-          chunks: relevantChunks,
+          chunks: contextChunks,
         })
       : buildPaperGroundedUserMessage({
           title: preparedPaper.title,
           question: content,
-          chunks: relevantChunks,
+          chunks: contextChunks,
         });
     const transportHistory = this.buildTransportHistory(snapshot, groundedUserMessage);
 
@@ -185,7 +187,7 @@ export class ContextChatService {
     snapshot = await this.store.appendMessage(sessionId, "assistant", result.content, {
       provider: result.provider,
       model: result.model,
-      citations: this.buildAssistantCitations(snapshot.context, relevantChunks, result.content),
+      citations: this.buildAssistantCitations(snapshot.context, contextChunks, result.content),
     });
     if (!snapshot) {
       throw new Error("Session not found while saving the assistant response.");

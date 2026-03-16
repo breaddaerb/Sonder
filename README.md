@@ -119,8 +119,9 @@ Current behavior:
 - multi-turn user/assistant messages are persisted per session
 - persisted chat storage now uses SQLite at `<Zotero profile>/sonder/context-chat.sqlite`
 - one-time migration imports legacy JSON from `<Zotero profile>/sonder/context-chat.json` and keeps a backup at `context-chat.json.bak`
-- the panel prepares chunked context from the active PDF or webpage snapshot and retrieves relevant chunks per question
-- responses are now grounded with retrieved paper context in the panel transport path
+- the panel prepares page-level chunked context from the active PDF or webpage snapshot and sends the full paper to the model
+- responses are now grounded with full paper context in the panel transport path
+- a `Pages` button in the header allows setting a page range (e.g., "1-8") to exclude irrelevant sections like references; default is all pages
 - assistant messages show lightweight citation chips for retrieved paper chunks
 - in `Item + Paper` mode, assistant citations include a `Selected annotation/note` chip to preserve item identity
 - clicking a citation chip jumps back to the relevant PDF paragraph region (fine-grained y-offset), or selects the cited item for item-source chips
@@ -141,7 +142,7 @@ Current limitation:
 
 - citation jumping scrolls to the approximate paragraph region within a PDF page using y-coordinate offsets from text extraction (for snapshots, all chunks are labeled as page 1 without sub-page positioning)
 - math preview quality depends on the model emitting explicit math delimiters consistently, though the panel now nudges it toward `$...$` / `$$...$$`
-- retrieval is currently a simple chunked lexical-ranking implementation, not the final retrieval stack yet
+- full-paper context is sent to the model by default; for very long documents this may approach model token limits
 - item+paper mode always injects selected item text; paper retrieval still depends on available PDF preparation context
 - runtime UX is fully panel-first; legacy popup/command-tag runtime paths have been removed
 
