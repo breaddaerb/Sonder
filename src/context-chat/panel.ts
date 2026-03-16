@@ -1549,7 +1549,11 @@ export class ContextChatPanel {
           this.state.renamingSessionDraft = renameInput.value;
         });
         renameInput.addEventListener("keydown", (event) => {
+          const composing = (event as any).isComposing || (event as any).keyCode == 229;
           if (event.key == "Enter") {
+            if (composing) {
+              return;
+            }
             event.preventDefault();
             event.stopPropagation();
             void this.confirmRenameSession(session.id);
@@ -1589,6 +1593,9 @@ export class ContextChatPanel {
           void this.loadSession(session.id);
         });
         item.addEventListener("keydown", (event) => {
+          if (event.target !== item) {
+            return;
+          }
           if (event.key == "Enter" || event.key == " ") {
             event.preventDefault();
             void this.loadSession(session.id);
