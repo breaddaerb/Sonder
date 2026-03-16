@@ -108,7 +108,7 @@ Current behavior:
 - in `Item + Paper` mode, selected item content is force-injected as primary anchor context
 - the latest saved session is restored automatically per context (`paper` or `item+paper`)
 - `New Session` creates another persisted session for the same context
-- `History` lists saved sessions for the current context
+- `History` lists saved sessions for the current context and supports search/rename/delete
 - `Clear Session` clears messages in the active session with confirmation
 - panel header includes Codex auth actions (`Enable/Login/Finish/Logout Codex`) so OAuth does not depend on slash commands
 - panel header includes a `Configure API` button for setting up a custom OpenAI-compatible API endpoint (base URL + API key + model name) with test-connection validation

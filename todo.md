@@ -136,7 +136,7 @@ Rationale: JSON-file storage was sufficient for MVP but is now a scale/reliabili
   - [x] make migration idempotent (safe on restart)
 - [x] Keep external store API stable for panel/service callers
 - [x] Add tests for migration + CRUD parity
-- [ ] Manual verification: existing chat history is preserved post-migration
+- [x] Manual verification: existing chat history is preserved post-migration
 
 ---
 
@@ -329,10 +329,10 @@ Goal: allow users to preserve high-value dialogue outputs as structured insights
 - [x] Ensure existing chat/session behavior remains unchanged
 - [x] Add tests for insight CRUD and item/annotation filtering
 - [x] Add tests for marker write-back behavior
-- [ ] Manual verification in Zotero
-  - [ ] save insight from item+paper dialogue
-  - [ ] marker visible on source annotation
-  - [ ] reopen associated session and continue asking
+- [x] Manual verification in Zotero
+  - [x] save insight from item+paper dialogue
+  - [x] marker visible on source annotation
+  - [x] reopen associated session and continue asking
 
 ---
 
@@ -348,9 +348,9 @@ History must be saved, but not always shown expanded.
 - [x] Keep current session title/label visible
 
 Optional-but-likely-later:
-- [ ] rename session
-- [ ] delete session
-- [ ] search sessions
+- [x] rename session
+- [x] delete session
+- [x] search sessions
 
 ---
 
@@ -378,7 +378,7 @@ The panel now supports configuring a custom OpenAI-compatible API endpoint along
 - [x] Update `render()` to show custom API button state (`Configure API` / `API: {model}`)
 - [x] Update default model pref from `gpt-3.5-turbo` to `gpt-4o`
 - [x] Add unit tests for custom API provider helpers
-- [ ] Manual verification in Zotero: configure custom API, test connection, send a message
+- [x] Manual verification in Zotero: configure custom API, test connection, send a message
 
 ---
 
@@ -396,7 +396,7 @@ The context chat panel now supports webpage snapshot (HTML) attachments alongsid
 - [x] Update `fromAnnotationItem()` to accept snapshot parent attachments
 - [x] Improve error messages in panel for unsupported attachment types
 - [x] Update all user-facing "PDF" references to include "snapshot"
-- [ ] Manual verification: open webpage snapshot, click Chat, verify text extraction and chat
+- [x] Manual verification: open webpage snapshot, click Chat, verify text extraction and chat
 
 ---
 
@@ -421,8 +421,8 @@ A core value of paper chat is being able to jump back to source.
 Current inherited baseline disables the old MathJax plugin path because it broke Zotero sandbox startup.
 
 - [x] Decide safe formula rendering strategy for Sonder
-- [ ] Confirm chosen strategy does not break plugin startup
-- [ ] Test long technical/math-heavy answers in the new panel
+- [x] Confirm chosen strategy does not break plugin startup
+- [x] Test long technical/math-heavy answers in the new panel
 - [x] Improve equation readability so outputs do not fall back to ugly raw formula text where avoidable
 - [x] Prefer a markdown-like rendering/copy format that stays easy to paste into Notion
 
@@ -504,35 +504,35 @@ Recommended sequence for happy coding:
 Sonder V1 should satisfy all of these:
 
 ### Stability
-- [ ] plugin still loads reliably in Zotero
-- [ ] Sonder still appears in Add-ons
-- [ ] Codex OAuth still works
-- [ ] Codex chat still works
+- [x] plugin still loads reliably in Zotero
+- [x] Sonder still appears in Add-ons
+- [x] Codex OAuth still works
+- [x] Codex chat still works
 
 ### Paper chat
-- [ ] open a PDF
-- [ ] click `Chat`
-- [ ] large panel opens
-- [ ] clearly shows paper context
-- [ ] ask multiple questions about the paper
-- [ ] restore previous paper session later
+- [x] open a PDF
+- [x] click `Chat`
+- [x] large panel opens
+- [x] clearly shows paper context
+- [x] ask multiple questions about the paper
+- [x] restore previous paper session later
 
 ### Item + paper chat
-- [ ] select annotation/note item
-- [ ] click `Chat`
-- [ ] panel opens in item+paper mode
-- [ ] selected item content is always included
-- [ ] ask follow-up questions naturally
-- [ ] restore previous item+paper session later
+- [x] select annotation/note item
+- [x] click `Chat`
+- [x] panel opens in item+paper mode
+- [x] selected item content is always included
+- [x] ask follow-up questions naturally
+- [x] restore previous item+paper session later
 
 ### History
-- [ ] create a new session for same paper
-- [ ] switch among sessions for same context
+- [x] create a new session for same paper
+- [x] switch among sessions for same context
 
 ### UX
 - [x] main flow does not depend on command tags
 - [x] main flow does not depend on shortcuts
-- [ ] user always knows current context
+- [x] user always knows current context
 
 ---
 

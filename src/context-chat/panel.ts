@@ -84,6 +84,9 @@ export class ContextChatPanel {
     savedInsightsByMessage: Record<string, string>;
     insights: StoredInsight[];
     insightsLoading: boolean;
+    historySearch: string;
+    renamingSessionId?: string;
+    renamingSessionDraft: string;
   } = {
     visible: false,
     loading: false,
@@ -95,6 +98,8 @@ export class ContextChatPanel {
     savedInsightsByMessage: {},
     insights: [],
     insightsLoading: false,
+    historySearch: "",
+    renamingSessionDraft: "",
   };
 
   constructor(
@@ -286,6 +291,18 @@ export class ContextChatPanel {
         border-color: #93c5fd;
         color: #1d4ed8;
       }
+      #sonder-context-chat-panel .sonder-action.sonder-action-small {
+        padding: 6px 10px;
+        font-size: 11px;
+      }
+      #sonder-context-chat-panel .sonder-action.is-danger {
+        color: #b91c1c;
+        border-color: #fecaca;
+        background: #fff5f5;
+      }
+      #sonder-context-chat-panel .sonder-action.is-danger:hover {
+        background: #fee2e2;
+      }
       #sonder-context-chat-panel .sonder-send:not(:disabled) {
         background: linear-gradient(135deg, #1f6feb 0%, #7c3aed 100%);
         color: #fff;
@@ -311,6 +328,26 @@ export class ContextChatPanel {
         width: 100%;
         font-size: 12px;
         color: #64748b;
+      }
+      #sonder-context-chat-panel .sonder-history-search {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #dbe2ea;
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 12px;
+        background: #fff;
+        color: #0f172a;
+      }
+      #sonder-context-chat-panel .sonder-history-rename-input {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #93c5fd;
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 13px;
+        background: #fff;
+        color: #0f172a;
       }
       #sonder-context-chat-panel .sonder-history-list {
         display: flex;
@@ -356,6 +393,11 @@ export class ContextChatPanel {
         font-size: 12px;
         line-height: 1.4;
         color: #64748b;
+      }
+      #sonder-context-chat-panel .sonder-history-session-actions {
+        margin-top: 8px;
+        display: flex;
+        gap: 6px;
       }
       #sonder-context-chat-panel .sonder-message-list {
         flex: 1;
@@ -938,6 +980,9 @@ export class ContextChatPanel {
         ? await this.store.getOrCreateItemPaperSession(itemPaperContext)
         : await this.store.getOrCreatePaperSession(paperContext!);
       this.state.savedInsightsByMessage = {};
+      this.state.historySearch = "";
+      this.state.renamingSessionId = undefined;
+      this.state.renamingSessionDraft = "";
       await this.refreshInsightsForCurrentContext();
       this.state.loading = false;
       this.state.loadingPhase = undefined;
@@ -969,6 +1014,8 @@ export class ContextChatPanel {
       if (snapshot) {
         this.state.snapshot = snapshot;
         this.state.savedInsightsByMessage = {};
+        this.state.renamingSessionId = undefined;
+        this.state.renamingSessionDraft = "";
         await this.refreshInsightsForCurrentContext();
         this.syncPaperStatus();
       }
@@ -1003,6 +1050,8 @@ export class ContextChatPanel {
       if (snapshot) {
         this.state.snapshot = snapshot;
         this.state.savedInsightsByMessage = {};
+        this.state.renamingSessionId = undefined;
+        this.state.renamingSessionDraft = "";
         await this.refreshInsightsForCurrentContext();
         this.syncPaperStatus();
       }
@@ -1179,6 +1228,8 @@ export class ContextChatPanel {
       if (snapshot) {
         this.state.snapshot = snapshot;
         this.state.savedInsightsByMessage = {};
+        this.state.renamingSessionId = undefined;
+        this.state.renamingSessionDraft = "";
         await this.refreshInsightsForCurrentContext();
         this.syncPaperStatus();
       }
@@ -1250,6 +1301,123 @@ export class ContextChatPanel {
     }
   }
 
+  private beginRenameSession(sessionId: string, currentTitle: string) {
+    this.state.renamingSessionId = sessionId;
+    this.state.renamingSessionDraft = currentTitle;
+    this.render();
+    this.ownerWindow.setTimeout(() => {
+      const input = this.historyDrawer.querySelector(`.sonder-history-rename-input[data-session-id=\"${sessionId}\"]`) as HTMLInputElement | null;
+      input?.focus();
+      if (input) {
+        const end = input.value.length;
+        try {
+          input.setSelectionRange(end, end);
+        } catch {
+          // ignore
+        }
+      }
+    }, 0);
+  }
+
+  private cancelRenameSession() {
+    this.state.renamingSessionId = undefined;
+    this.state.renamingSessionDraft = "";
+    this.render();
+  }
+
+  private async confirmRenameSession(sessionId: string) {
+    const nextTitle = this.state.renamingSessionDraft.trim();
+    if (!nextTitle) {
+      this.ownerWindow.alert("Session title cannot be empty.");
+      return;
+    }
+
+    this.state.loading = true;
+    this.state.loadingPhase = "opening";
+    this.render();
+    try {
+      const renamed = await this.store.renameSession(sessionId, nextTitle);
+      if (!renamed) {
+        this.ownerWindow.alert("Failed to rename session.");
+        return;
+      }
+      const currentSessionId = this.state.snapshot?.session.id;
+      if (currentSessionId) {
+        const snapshot = await this.store.getSessionSnapshot(currentSessionId);
+        if (snapshot) {
+          this.state.snapshot = snapshot;
+        }
+      }
+      this.state.renamingSessionId = undefined;
+      this.state.renamingSessionDraft = "";
+      this.state.error = undefined;
+    } catch (error: any) {
+      Zotero.logError(error);
+      this.state.error = "Failed to rename session.";
+    } finally {
+      this.state.loading = false;
+      this.state.loadingPhase = undefined;
+      this.render();
+    }
+  }
+
+  private async deleteSession(sessionId: string) {
+    const snapshot = this.state.snapshot;
+    if (!snapshot) {
+      return;
+    }
+    if (!this.ownerWindow.confirm("Delete this session? Messages in this session will be removed.")) {
+      return;
+    }
+
+    this.state.loading = true;
+    this.state.loadingPhase = "opening";
+    this.render();
+
+    try {
+      const deleted = await this.store.deleteSession(sessionId);
+      if (!deleted) {
+        this.ownerWindow.alert("Session not found.");
+        return;
+      }
+      if (this.state.renamingSessionId == sessionId) {
+        this.state.renamingSessionId = undefined;
+        this.state.renamingSessionDraft = "";
+      }
+
+      const remaining = await this.store.listSessions(deleted.contextId);
+      if (remaining.length == 0) {
+        const created = await this.store.createNewSession(deleted.contextId);
+        this.state.snapshot = created;
+      } else if (snapshot.session.id == sessionId) {
+        const next = await this.store.getSessionSnapshot(remaining[0].id);
+        if (next) {
+          this.state.snapshot = next;
+        }
+      } else {
+        const current = await this.store.getSessionSnapshot(snapshot.session.id);
+        if (current) {
+          this.state.snapshot = current;
+        } else {
+          const fallback = await this.store.getSessionSnapshot(remaining[0].id);
+          if (fallback) {
+            this.state.snapshot = fallback;
+          }
+        }
+      }
+      await this.refreshInsightsForCurrentContext();
+      this.state.error = undefined;
+    } catch (error: any) {
+      Zotero.logError(error);
+      this.state.error = "Failed to delete session.";
+    } finally {
+      this.state.loading = false;
+      this.state.loadingPhase = undefined;
+      this.render();
+      this.focusComposer();
+    }
+  }
+
   private async handleSend() {
     const snapshot = this.state.snapshot;
     const content = this.state.draft.trim();
@@ -1306,39 +1474,169 @@ export class ContextChatPanel {
     }
 
     const doc = this.ownerWindow.document;
+    const searchTerm = this.state.historySearch.trim().toLowerCase();
+    const filteredSessions = searchTerm
+      ? snapshot.sessions.filter((session) => {
+          const haystack = `${session.title} ${session.provider || ""} ${session.model || ""}`.toLowerCase();
+          return haystack.includes(searchTerm);
+        })
+      : snapshot.sessions;
+
     const meta = createHTML(doc, "div");
     meta.className = "sonder-history-meta";
-    meta.textContent = `${snapshot.sessions.length} saved session${snapshot.sessions.length == 1 ? "" : "s"} for this paper`;
+    meta.textContent = `${filteredSessions.length} of ${snapshot.sessions.length} saved session${snapshot.sessions.length == 1 ? "" : "s"} for this paper`;
+
+    const searchInput = createHTML(doc, "input");
+    searchInput.className = "sonder-history-search";
+    searchInput.type = "search";
+    searchInput.placeholder = "Search sessions by title/model";
+    searchInput.value = this.state.historySearch;
+    searchInput.addEventListener("input", (event) => {
+      this.state.historySearch = searchInput.value;
+      const inputEvent = event as InputEvent;
+      if (inputEvent.isComposing) {
+        return;
+      }
+      const cursor = searchInput.selectionStart ?? this.state.historySearch.length;
+      this.renderHistory();
+      const nextInput = this.historyDrawer.querySelector(".sonder-history-search") as HTMLInputElement | null;
+      if (nextInput) {
+        nextInput.focus();
+        const pos = Math.min(cursor, nextInput.value.length);
+        try {
+          nextInput.setSelectionRange(pos, pos);
+        } catch {
+          // ignore
+        }
+      }
+    });
+    searchInput.addEventListener("compositionend", () => {
+      this.state.historySearch = searchInput.value;
+      this.renderHistory();
+      const nextInput = this.historyDrawer.querySelector(".sonder-history-search") as HTMLInputElement | null;
+      nextInput?.focus();
+    });
 
     const list = createHTML(doc, "div");
     list.className = "sonder-history-list";
 
-    snapshot.sessions.forEach((session) => {
+    filteredSessions.forEach((session) => {
       const item = createHTML(doc, "div");
-      item.className = "sonder-history-item is-clickable" + (session.id == snapshot.session.id ? " is-active" : "");
-      item.setAttribute("role", "button");
-      item.setAttribute("tabindex", "0");
-      item.addEventListener("click", () => {
-        void this.loadSession(session.id);
-      });
-      item.addEventListener("keydown", (event) => {
-        if (event.key == "Enter" || event.key == " ") {
-          event.preventDefault();
-          void this.loadSession(session.id);
-        }
-      });
-
-      const title = createHTML(doc, "div");
-      title.className = "sonder-history-item-title";
-      title.textContent = session.title;
+      item.className = "sonder-history-item" + (session.id == snapshot.session.id ? " is-active" : "");
 
       const subtitle = createHTML(doc, "div");
       subtitle.className = "sonder-history-item-subtitle";
       subtitle.textContent = `Updated ${formatTimestamp(session.updatedAt)} · ${session.provider || "provider"}${session.model ? ` / ${session.model}` : ""}`;
 
-      item.append(title, subtitle);
+      const actions = createHTML(doc, "div");
+      actions.className = "sonder-history-session-actions";
+
+      if (this.state.renamingSessionId == session.id) {
+        item.classList.remove("is-clickable");
+        item.removeAttribute("role");
+        item.removeAttribute("tabindex");
+
+        const renameInput = createHTML(doc, "input");
+        renameInput.className = "sonder-history-rename-input";
+        renameInput.type = "text";
+        renameInput.value = this.state.renamingSessionDraft;
+        renameInput.setAttribute("data-session-id", session.id);
+        renameInput.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        });
+        renameInput.addEventListener("input", () => {
+          this.state.renamingSessionDraft = renameInput.value;
+        });
+        renameInput.addEventListener("keydown", (event) => {
+          const composing = (event as any).isComposing || (event as any).keyCode == 229;
+          if (event.key == "Enter") {
+            if (composing) {
+              return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            void this.confirmRenameSession(session.id);
+          }
+          if (event.key == "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            this.cancelRenameSession();
+          }
+        });
+
+        const saveButton = createHTML(doc, "button");
+        saveButton.className = "sonder-action sonder-action-small";
+        saveButton.textContent = "Save";
+        saveButton.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          void this.confirmRenameSession(session.id);
+        });
+
+        const cancelButton = createHTML(doc, "button");
+        cancelButton.className = "sonder-action sonder-action-small";
+        cancelButton.textContent = "Cancel";
+        cancelButton.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          this.cancelRenameSession();
+        });
+
+        actions.append(saveButton, cancelButton);
+        item.append(renameInput, subtitle, actions);
+      } else {
+        item.classList.add("is-clickable");
+        item.setAttribute("role", "button");
+        item.setAttribute("tabindex", "0");
+        item.addEventListener("click", () => {
+          void this.loadSession(session.id);
+        });
+        item.addEventListener("keydown", (event) => {
+          if (event.target !== item) {
+            return;
+          }
+          if (event.key == "Enter" || event.key == " ") {
+            event.preventDefault();
+            void this.loadSession(session.id);
+          }
+        });
+
+        const title = createHTML(doc, "div");
+        title.className = "sonder-history-item-title";
+        title.textContent = session.title;
+
+        const renameButton = createHTML(doc, "button");
+        renameButton.className = "sonder-action sonder-action-small";
+        renameButton.textContent = "Rename";
+        renameButton.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          this.beginRenameSession(session.id, session.title);
+        });
+
+        const deleteButton = createHTML(doc, "button");
+        deleteButton.className = "sonder-action sonder-action-small is-danger";
+        deleteButton.textContent = "Delete";
+        deleteButton.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          void this.deleteSession(session.id);
+        });
+
+        actions.append(renameButton, deleteButton);
+        item.append(title, subtitle, actions);
+      }
+
       list.appendChild(item);
     });
+
+    if (filteredSessions.length == 0) {
+      const empty = createHTML(doc, "div");
+      empty.className = "sonder-history-item-subtitle";
+      empty.textContent = searchTerm ? "No sessions match your search." : "No saved sessions for this context yet.";
+      list.appendChild(empty);
+    }
 
     const insightsMeta = createHTML(doc, "div");
     insightsMeta.className = "sonder-history-meta";
@@ -1387,7 +1685,7 @@ export class ContextChatPanel {
       insightsList.appendChild(item);
     });
 
-    this.historyDrawer.append(meta, list, insightsMeta, insightsList);
+    this.historyDrawer.append(meta, searchInput, list, insightsMeta, insightsList);
   }
 
   private async jumpToCitation(citation: { sourceType: "paper" | "item"; target?: string; page?: number; yOffset?: number }) {

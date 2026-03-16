@@ -726,6 +726,65 @@ export class ContextChatStore {
     return sortSessionsByUpdatedAt(await this.getSessionsForContext(contextId));
   }
 
+  public async renameSession(sessionId: string, nextTitle: string): Promise<StoredSession | undefined> {
+    await this.ready();
+    const trimmed = nextTitle.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+
+    const db = this.ensureDb();
+    const rows = await db.execute(
+      `SELECT id, context_id, title, created_at, updated_at, provider, model
+       FROM sessions WHERE id = ? LIMIT 1`,
+      [sessionId],
+    );
+    if (!rows.length) {
+      return undefined;
+    }
+
+    const session = this.rowToSession(rows[0]);
+    const context = await this.getContextById(session.contextId);
+    if (!context) {
+      return undefined;
+    }
+
+    const now = Date.now();
+    session.title = trimmed;
+
+    await db.executeTransaction(async () => {
+      await db.execute(
+        `UPDATE sessions
+         SET title = ?, updated_at = ?
+         WHERE id = ?`,
+        [session.title, now, session.id],
+      );
+      await this.touchSession(context, session, now);
+    });
+
+    return {
+      ...session,
+      updatedAt: now,
+    };
+  }
+
+  public async deleteSession(sessionId: string): Promise<{ contextId: string; sessionId: string } | undefined> {
+    await this.ready();
+    const db = this.ensureDb();
+    const rows = await db.execute(
+      `SELECT id, context_id, title, created_at, updated_at, provider, model
+       FROM sessions WHERE id = ? LIMIT 1`,
+      [sessionId],
+    );
+    if (!rows.length) {
+      return undefined;
+    }
+
+    const session = this.rowToSession(rows[0]);
+    await db.execute("DELETE FROM sessions WHERE id = ?", [sessionId]);
+    return { contextId: session.contextId, sessionId };
+  }
+
   public async createInsight(input: {
     itemKey: string;
     libraryID?: number;
