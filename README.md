@@ -10,38 +10,16 @@
 
 ## Status
 
-This repository is the migrated successor of the previous `zotero-gpt` working branch.
-
-Current baseline goals already carried over:
-
-- the plugin can be built as a Zotero add-on
-- the plugin can be discovered and shown by Zotero
-- the current OAuth/Codex login pipeline is preserved
-- the current Codex backend chat pipeline is preserved
-
-The next product phase is a larger rewrite toward the context-chat UX described in:
-
-- [`docs/context-chat-spec-v0.1.md`](docs/context-chat-spec-v0.1.md)
-
-## What this repo is for right now
-
-This repo is **not** yet the final context-chat implementation.
-It is the new, cleaner project home that preserves the currently working technical base:
-
-- working add-on packaging / bootstrap behavior
-- working Zotero loadability
-- working ChatGPT/Codex OAuth flow
-- working Codex request path and provider plumbing
-
-That working base will be used for the next implementation stage.
+Sonder is now panel-first and context-aware for Zotero academic chat (PDF/snapshot + item+paper workflows).
 
 ## Key docs
 
-- [`docs/migration-plan.md`](docs/migration-plan.md)
-- [`docs/context-chat-spec-v0.1.md`](docs/context-chat-spec-v0.1.md)
 - [`docs/context-chat-architecture.md`](docs/context-chat-architecture.md)
+- [`docs/paper-context-pipeline.md`](docs/paper-context-pipeline.md)
 - [`docs/codex-oauth.md`](docs/codex-oauth.md)
-- [`docs/plugin-loading-fix.md`](docs/plugin-loading-fix.md)
+- [`docs/context-chat-spec-v0.1.md`](docs/context-chat-spec-v0.1.md) *(historical/spec context)*
+- [`docs/migration-plan.md`](docs/migration-plan.md) *(historical migration notes)*
+- [`docs/plugin-loading-fix.md`](docs/plugin-loading-fix.md) *(historical loading-debug notes)*
 
 ## Build
 
@@ -179,13 +157,9 @@ npm run tsc
 npm run build-dev
 ```
 
-## Immediate migration acceptance criteria
-
-The migrated baseline is considered acceptable if it still satisfies these already-working capabilities:
+## Baseline stability expectations
 
 - Sonder appears in Zotero Add-ons
 - the plugin starts successfully in Zotero
-- Codex OAuth login can still be completed
-- Codex chat can still return a response
-
-Those are the minimum guarantees before the context-chat rewrite begins.
+- Codex OAuth login works
+- Codex chat returns responses

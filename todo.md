@@ -455,8 +455,8 @@ These are not blockers for the migration baseline, but they should be cleaned up
 - [x] Remove legacy command-tag module (`src/modules/base.ts`) from active codebase
 - [x] Remove legacy views-coupled OpenAI helper flow (`getGPTResponse*`) from active codebase
 - [x] Remove temporary views compatibility shim and startup views binding
-- [ ] Remove/bootstrap debug marker code when no longer needed
-- [ ] Clean up leftover predecessor naming in docs/comments where appropriate
+- [x] Remove/bootstrap debug marker code when no longer needed
+- [x] Clean up leftover predecessor naming in docs/comments where appropriate
 - [x] Decide whether old inherited assets/tags should stay in repo or move to legacy folder
 
 ---

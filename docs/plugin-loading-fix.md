@@ -154,13 +154,9 @@ This was the most useful way to distinguish:
 - bootstrap failure
 - runtime/startup crash after discovery
 
-### Temporary bootstrap marker
+### Temporary bootstrap marker (historical)
 
-`addon/bootstrap.js` currently writes a debugging marker file:
-
-- `/tmp/zoterogpt-bootstrap.log`
-
-This is just a debugging aid and can be removed later.
+A temporary bootstrap marker file was used during earlier loading debugging. This marker code has since been removed from active runtime.
 
 ## Current caveats / follow-up cleanup
 
@@ -172,7 +168,7 @@ Known cleanup items:
 - the development auto-open fallback should be removed after shortcut/menu UX is stabilized
 - MathJax should be replaced or reintroduced in a Zotero-safe way
 - the temporary test add-on id should eventually be renamed to the final production id if desired
-- bootstrap debug marker code can be removed once startup is stable
+- bootstrap debug marker code has been removed after startup stabilized
 
 ## Summary
 
