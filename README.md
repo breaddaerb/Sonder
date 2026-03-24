@@ -73,9 +73,9 @@ The button shows `API: {model}` when configured. Click it again to reconfigure o
 
 This works with any provider that exposes an OpenAI-compatible `/chat/completions` endpoint. If your provider requires a `/v1/` prefix, include it in the base URL (e.g., `https://api.openai.com/v1`).
 
-## Experimental paper chat panel
+## Paper chat panel
 
-The rewrite now includes an experimental paper-chat panel as the primary UI surface.
+Sonder’s primary UI surface is the context-aware paper chat panel.
 
 Current behavior:
 
@@ -90,6 +90,7 @@ Current behavior:
 - `History` lists saved sessions for the current context and supports search/rename/delete
 - `Clear Session` clears messages in the active session with confirmation
 - panel header includes Codex auth actions (`Enable/Login/Finish/Logout Codex`) so OAuth does not depend on slash commands
+- when Codex provider is active, a `Codex: {model}` button appears for switching OAuth model
 - panel header includes a `Configure API` button for setting up a custom OpenAI-compatible API endpoint (base URL + API key + model name) with test-connection validation
 - drag the panel’s left edge to resize width (width is remembered)
 - the composer is wired to the current provider transport
@@ -141,13 +142,12 @@ Note:
 - Sonder currently injects grounding instructions into the latest **user** message (not a separate persistent system message).
 - If you change citation instruction format, also check `parseCitedIndices(...)` in `src/context-chat/paperRetrieval.ts` so citation chips still parse correctly.
 
-Current limitation:
+Current limitations:
 
-- citation jumping scrolls to the approximate paragraph region within a PDF page using y-coordinate offsets from text extraction (for snapshots, all chunks are labeled as page 1 without sub-page positioning)
-- math preview quality depends on the model emitting explicit math delimiters consistently, though the panel now nudges it toward `$...$` / `$$...$$`
-- full-paper context is sent to the model by default; for very long documents this may approach model token limits
-- item+paper mode always injects selected item text; paper retrieval still depends on available PDF preparation context
-- runtime UX is fully panel-first; legacy popup/command-tag runtime paths have been removed
+- citation jumping scrolls to approximate paragraph region using y-offsets; snapshots currently lack fine-grained sub-page positioning
+- full-paper context is sent by default; very long documents may approach model token limits
+- item+paper mode always injects selected item text; paper grounding still depends on successful extraction/preparation
+- cross-item insight retrieval/search is not implemented yet
 
 ## Tests
 
@@ -157,9 +157,3 @@ npm run tsc
 npm run build-dev
 ```
 
-## Baseline stability expectations
-
-- Sonder appears in Zotero Add-ons
-- the plugin starts successfully in Zotero
-- Codex OAuth login works
-- Codex chat returns responses
