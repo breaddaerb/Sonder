@@ -148,7 +148,7 @@ export class ContextChatService {
     }
     callbacks.onUserSnapshot?.(snapshot);
 
-    let preparedPaper: PreparedPaperContext | undefined;
+    let preparedPaper: PreparedPaperContext;
     try {
       preparedPaper = await this.ensurePreparedPaperContext(snapshot.context, callbacks.onPaperStatusChange);
     } catch {
@@ -158,11 +158,13 @@ export class ContextChatService {
         title: snapshot.context.title,
         preparedAt: Date.now(),
         chunks: [],
+        sourceKind: "pdf",
       };
     }
 
-    // Send all paper chunks (one per page), optionally filtered by user-specified page range.
+    // Send all paper chunks (one per page/part), optionally filtered by page range.
     const contextChunks = filterChunksByPageRange(preparedPaper.chunks, pageRange);
+
     const groundedUserMessage = snapshot.context.type == "item+paper"
       ? buildItemPaperGroundedUserMessage({
           paperTitle: preparedPaper.title,

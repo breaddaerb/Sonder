@@ -145,7 +145,7 @@ Note:
 Current limitations:
 
 - citation jumping scrolls to approximate paragraph region using y-offsets; snapshots currently lack fine-grained sub-page positioning
-- full-paper context is sent by default; very long documents may approach model token limits
+- full-paper context is sent by default in both PDF and snapshot modes; very long documents may still approach model/provider token limits
 - item+paper mode always injects selected item text; paper grounding still depends on successful extraction/preparation
 - cross-item insight retrieval/search is not implemented yet
 

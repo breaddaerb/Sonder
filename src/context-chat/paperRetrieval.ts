@@ -18,6 +18,7 @@ export interface PreparedPaperContext {
   title: string;
   preparedAt: number;
   chunks: PaperChunk[];
+  sourceKind: "pdf" | "snapshot";
 }
 
 function normalizeText(text: string) {
@@ -355,11 +356,6 @@ function extractTextFromHtmlString(html: string): string {
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
     .replace(/<!--[\s\S]*?-->/g, "");
 
-  // Remove nav, header, footer blocks (best-effort for common patterns)
-  cleaned = cleaned
-    .replace(/<nav[\s\S]*?<\/nav>/gi, "")
-    .replace(/<footer[\s\S]*?<\/footer>/gi, "");
-
   // Replace block-level tags with newlines to preserve paragraph structure
   cleaned = cleaned
     .replace(/<\/?(p|div|br|h[1-6]|li|tr|blockquote|section|article|main|aside|pre|hr)[^>]*\/?>/gi, "\n")
@@ -390,62 +386,79 @@ function extractTextFromHtmlString(html: string): string {
  */
 function extractSnapshotTextFromDom(iframeWindow: any): string {
   try {
-    // Strategy 1: Direct document access (may work for simple readers)
-    const doc = iframeWindow?.document || iframeWindow?.wrappedJSObject?.document;
-    if (doc?.body) {
-      const directText = (doc.body.textContent || "").replace(/\s+/g, " ").trim();
-      if (directText.length > 200) {
-        return directText;
-      }
+    const visited = new Set<any>();
+    const collected: string[] = [];
 
-      // Strategy 2: Look for nested iframes that contain the actual snapshot content
+    const collectFromDocument = (doc: Document | undefined | null) => {
+      if (!doc?.body) {
+        return;
+      }
+      const text = (doc.body.textContent || "").replace(/\s+/g, " ").trim();
+      if (text.length > 0) {
+        collected.push(text);
+      }
       const iframes = doc.querySelectorAll("iframe") as NodeListOf<HTMLIFrameElement>;
       for (let i = 0; i < iframes.length; i++) {
         try {
-          const nestedDoc = iframes[i].contentDocument || (iframes[i] as any).contentWindow?.document;
-          if (nestedDoc?.body) {
-            const nestedText = (nestedDoc.body.textContent || "").replace(/\s+/g, " ").trim();
-            if (nestedText.length > 200) {
-              return nestedText;
-            }
+          const nestedWindow = (iframes[i] as any).contentWindow;
+          if (nestedWindow) {
+            collectFromWindow(nestedWindow);
+          }
+          const nestedDoc = iframes[i].contentDocument;
+          if (nestedDoc) {
+            collectFromDocument(nestedDoc);
           }
         } catch {
-          // Cross-origin or dead wrapper — skip
+          // ignore inaccessible nested frame
         }
       }
+    };
 
-      // Strategy 3: Try wrappedJSObject for privileged access to nested iframes
+    const collectFromWindow = (win: any) => {
+      if (!win || visited.has(win)) {
+        return;
+      }
+      visited.add(win);
       try {
-        const wrappedDoc = iframeWindow?.wrappedJSObject?.document;
+        collectFromDocument(win.document);
+      } catch {
+        // ignore
+      }
+      try {
+        const wrappedDoc = win?.wrappedJSObject?.document;
         if (wrappedDoc) {
-          const wrappedIframes = wrappedDoc.querySelectorAll("iframe");
-          for (let i = 0; i < wrappedIframes.length; i++) {
-            try {
-              const nestedDoc = wrappedIframes[i].contentDocument;
-              if (nestedDoc?.body) {
-                const nestedText = (nestedDoc.body.textContent || "").replace(/\s+/g, " ").trim();
-                if (nestedText.length > 200) {
-                  return nestedText;
-                }
-              }
-            } catch {
-              // Skip inaccessible frames
-            }
-          }
+          collectFromDocument(wrappedDoc);
         }
       } catch {
-        // wrappedJSObject access failed
+        // ignore
       }
+      try {
+        const frames = win.frames || [];
+        for (let i = 0; i < frames.length; i++) {
+          collectFromWindow(frames[i]);
+        }
+      } catch {
+        // ignore
+      }
+    };
 
-      // Return whatever direct text we got, even if short
-      if (directText.length > 0) {
-        return directText;
-      }
+    collectFromWindow(iframeWindow);
+    try {
+      collectFromWindow(iframeWindow?.wrappedJSObject);
+    } catch {
+      // ignore
     }
+
+    if (collected.length == 0) {
+      return "";
+    }
+
+    // Keep the richest view when multiple document shells are present.
+    return collected.sort((a, b) => b.length - a.length)[0];
   } catch (error: any) {
     Zotero.logError(error);
+    return "";
   }
-  return "";
 }
 
 /**
@@ -479,10 +492,11 @@ async function extractSnapshotTextFromFile(attachment: Zotero.Item): Promise<str
 
 /**
  * Read text chunks from an HTML snapshot attachment.
- * Uses a multi-strategy approach:
- * 1. Primary: Read HTML file from disk and parse text (most reliable)
- * 2. Fallback: Extract from reader iframe DOM (traversing nested iframes)
- * If both strategies yield no text, returns empty chunks (status will still be "ready").
+ * Uses a multi-strategy approach and prefers the richer extraction result:
+ * 1. Read HTML file from disk and parse text
+ * 2. Extract from reader iframe DOM (traversing nested iframes)
+ * Some snapshot shells contain only partial text in the raw file while full rendered text
+ * is available in reader DOM, so we compare both and keep the longer one.
  */
 async function readSnapshotChunks(
   reader: _ZoteroTypes.ReaderInstance,
@@ -491,17 +505,37 @@ async function readSnapshotChunks(
   contextId: string,
   title: string,
 ): Promise<PreparedPaperContext> {
-  // Strategy 1: Read from file (most reliable)
-  let text = await extractSnapshotTextFromFile(attachment);
+  // Strategy 1: Read from file
+  const fileText = await extractSnapshotTextFromFile(attachment);
 
-  // Strategy 2: Try DOM extraction as fallback
-  if (!text && reader._iframeWindow) {
-    text = extractSnapshotTextFromDom(reader._iframeWindow);
+  // Strategy 2: Extract from reader DOM
+  const domText = reader._iframeWindow
+    ? extractSnapshotTextFromDom(reader._iframeWindow)
+    : "";
+
+  // Prefer richer extraction (longer cleaned text) to avoid file-only partial shells.
+  const text = domText.length > fileText.length ? domText : fileText;
+
+  // Build virtual page chunks from snapshot text to avoid single massive prompt blocks.
+  // Snapshots have no real page structure, so we use virtual page numbers.
+  const normalized = normalizeText(text || "");
+  const maxSnapshotChunkChars = 2200;
+  const chunks: PaperChunk[] = [];
+  if (normalized) {
+    for (let offset = 0, i = 0; offset < normalized.length; offset += maxSnapshotChunkChars, i += 1) {
+      const content = normalizeText(normalized.slice(offset, offset + maxSnapshotChunkChars));
+      if (!content) {
+        continue;
+      }
+      const page = i + 1;
+      chunks.push({
+        id: `s${page}-c1`,
+        page,
+        label: `part ${page}`,
+        content,
+      });
+    }
   }
-
-  // Build a single page-level chunk from the extracted text (snapshots have no page structure).
-  const pageChunk = text ? chunkByPageFromText(text, 1) : null;
-  const chunks = pageChunk ? [pageChunk] : [];
 
   return {
     contextId,
@@ -509,6 +543,7 @@ async function readSnapshotChunks(
     title,
     preparedAt: Date.now(),
     chunks,
+    sourceKind: "snapshot",
   };
 }
 
@@ -550,6 +585,7 @@ async function readPdfChunks(
     title,
     preparedAt: Date.now(),
     chunks,
+    sourceKind: "pdf",
   };
 }
 
