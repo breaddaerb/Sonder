@@ -1,44 +1,6 @@
 import { config } from "../../../package.json";
-import { MD5 } from "crypto-js"
-import { Document } from "langchain/document";
-import LocalStorage from "../localStorage";
-import meetState from "./state";
 import { getValidCodexAccessToken } from "./CodexOAuth";
-import { getCurrentModel, getProvider, supportsEmbeddings } from "../provider";
-const similarity = require('compute-cosine-similarity');
-
-declare type RequestArg = { headers: any, api: string, body: Function, remove?: string | RegExp, process?: Function }
-let chatID: string
-const requestArgs: RequestArg[] = [
-  {
-    api: "https://aigpt.one/api/chat-stream",
-    headers: {
-      "path": "v1/chat/completions"
-    },
-    body: (requestText: string, messages: any) => {
-      return {
-        "model": "gpt-3.5-turbo",
-        messages: messages,
-        stream: true,
-        "max_tokens": 2000,
-        "presence_penalty": 0
-      }
-    }
-  },
-  {
-    api: "https://chatbot.theb.ai/api/chat-process",
-    headers: {
-    },
-    body: (requestText: string, messages: any) => {
-      return { "prompt": requestText, "options": { "parentMessageId": chatID } }
-    },
-    process: (text: string) => {
-      const res = JSON.parse(text.split("\n").slice(-1)[0])
-      chatID = res.id
-      return res.text
-    }
-  }
-]
+import { getCurrentModel, getProvider } from "../provider";
 
 const CODEX_BASE_URL = "https://chatgpt.com/backend-api/codex/responses";
 const CODEX_INSTRUCTIONS = "You are a helpful assistant inside the Zotero plugin Sonder. Answer clearly, be concise when possible, and reply in the same language as the user's message unless they ask otherwise.";
@@ -125,109 +87,6 @@ function formatCodexError(error: any) {
   } catch { }
   const title = status ? `Codex ${status}` : "Codex Error"
   return `# ${title}\n> ${CODEX_BASE_URL}\n\n${message}`
-}
-
-/**
- * 给定文本和文档，返回文档列表，返回最相似的几个
- * @param queryText
- * @param docs
- * @param obj
- * @returns
- */
-export async function similaritySearch(queryText: string, docs: Document[], obj: { key: string }) {
-  const storage = meetState.storage = meetState.storage || new LocalStorage(config.addonRef)
-  await storage.lock.promise;
-  const embeddings = new OpenAIEmbeddings() as any
-  const id = MD5(docs.map((i: any) => i.pageContent).join("\n\n")).toString()
-  await storage.lock
-  const _vv = storage.get(obj, id)
-  ztoolkit.log(_vv)
-  let vv: any
-  if (_vv) {
-    vv = _vv
-  } else {
-    vv = await embeddings.embedDocuments(docs.map((i: any) => i.pageContent))
-    window.setTimeout(async () => {
-      await storage.set(obj, id, vv)
-    })
-  }
-
-  const v0 = await embeddings.embedQuery(queryText)
-  const relatedNumber = Zotero.Prefs.get(`${config.addonRef}.relatedNumber`) as number
-  const k = relatedNumber * 5
-  const pp = vv.map((v: any) => similarity(v0, v));
-  docs = [...pp].sort((a, b) => b - a).slice(0, k).map((p: number) => {
-    return docs[pp.indexOf(p)]
-  })
-  return docs.sort((a, b) => b.pageContent.length - a.pageContent.length).slice(0, relatedNumber)
-}
-
-class OpenAIEmbeddings {
-  constructor() {
-  }
-  private async request(input: string[]) {
-    if (!supportsEmbeddings()) {
-      throw new Error("Embeddings are unavailable for the current provider.")
-    }
-    let api = Zotero.Prefs.get(`${config.addonRef}.api`) as string
-    api = api.replace(/\/(?:v1)?\/?$/, "")
-    const secretKey = Zotero.Prefs.get(`${config.addonRef}.secretKey`)
-    const split_len = Number(Zotero.Prefs.get(`${config.addonRef}.embeddingBatchNum`) || 10)
-    let res
-    const url = `${api}/v1/embeddings`
-    if (!secretKey) {
-      new ztoolkit.ProgressWindow(url, { closeOtherProgressWindows: true })
-        .createLine({ text: "Your secretKey is not configured.", type: "default" })
-        .show()
-      throw new Error("Your secretKey is not configured.")
-    }
-    let final_embeddings: any[] = []
-    for (let i = 0; i < input.length; i += split_len) {
-      const chunk = input.slice(i, i + split_len)
-      ztoolkit.log("input", chunk)
-      try {
-        res = await Zotero.HTTP.request(
-          "POST",
-          url,
-          {
-            responseType: "json",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${secretKey}`,
-            },
-            body: JSON.stringify({
-              model: "text-embedding-ada-002",
-              input: chunk
-            }),
-          }
-        )
-      } catch (error: any) {
-        try {
-          error = error.xmlhttp.response?.error
-          new ztoolkit.ProgressWindow(error.code, { closeOtherProgressWindows: true })
-            .createLine({ text: error.message, type: "default" })
-            .show()
-        } catch {
-          new ztoolkit.ProgressWindow("Error", { closeOtherProgressWindows: true })
-            .createLine({ text: error.message, type: "default" })
-            .show()
-        }
-        throw error
-      }
-      if (res?.response?.data) {
-        final_embeddings = final_embeddings.concat(res.response.data.map((i: any) => i.embedding))
-      }
-    }
-    return final_embeddings
-  }
-
-  public async embedDocuments(texts: string[]) {
-    return await this.request(texts)
-  }
-
-  public async embedQuery(text: string) {
-    return (await this.request([text]))?.[0]
-  }
 }
 
 export type TransportChatMessage = { role: "user" | "assistant"; content: string };
@@ -361,56 +220,6 @@ async function requestCodexChat(
   }
 }
 
-async function requestFallbackChat(
-  requestArg: RequestArg,
-  messages: TransportChatMessage[],
-  options: TransportChatOptions = {}
-): Promise<TransportChatResult> {
-  let responseText: string | undefined
-  let previewText = ""
-  const chatNumber = Zotero.Prefs.get(`${config.addonRef}.chatNumber`) as number
-  const slicedMessages = messages.slice(-chatNumber)
-  const requestText = slicedMessages[slicedMessages.length - 1]?.content || ""
-  const body = JSON.stringify(requestArg.body(requestText, slicedMessages))
-  try {
-    await Zotero.HTTP.request(
-      "POST",
-      requestArg.api,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          ...requestArg.headers,
-        },
-        body,
-        responseType: "text",
-        requestObserver: (xmlhttp: XMLHttpRequest) => {
-          xmlhttp.onprogress = (e: any) => {
-            previewText = e.target.response.replace(requestArg.remove, "")
-            if (requestArg.process) {
-              previewText = requestArg.process(previewText)
-            }
-            options.onText?.(previewText)
-            if (e.target.timeout) {
-              e.target.timeout = 0;
-            }
-          };
-        },
-      }
-    );
-    responseText = previewText
-  } catch (error: any) {
-    responseText = `# Request Error\n> ${requestArg.api}\n\n${error?.message || error}`
-    new ztoolkit.ProgressWindow("Request Error", { closeOtherProgressWindows: true })
-      .createLine({ text: error?.message || "Unknown request error.", type: "default" })
-      .show()
-  }
-  return {
-    provider: "openai-api",
-    model: getCurrentModel("openai-api") || "fallback",
-    content: responseText || "",
-  }
-}
-
 export async function requestProviderChat(
   messages: TransportChatMessage[],
   options: TransportChatOptions = {}
@@ -421,7 +230,11 @@ export async function requestProviderChat(
   }
   const secretKey = Zotero.Prefs.get(`${config.addonRef}.secretKey`)
   if (!secretKey) {
-    return await requestFallbackChat(requestArgs[1], messages, options)
+    return {
+      provider: "openai-api",
+      model: getCurrentModel("openai-api") || "",
+      content: "# Configuration Required\n\nNo API key is configured. Use **Configure API** in the panel header to set up an OpenAI-compatible endpoint, or **Enable Codex** to use ChatGPT OAuth.",
+    }
   }
   return await requestOpenAIChat(messages, options)
 }

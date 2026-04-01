@@ -552,3 +552,134 @@ That milestone should include:
 - [x] persisted session creation/loading
 
 Once M1 is real, the rest can be built incrementally.
+
+---
+
+## 19. Cleanup and refactor
+
+Post-V1 code health pass. Everything below is tech debt or architectural improvement — no user-facing feature changes.
+
+Last reviewed: 2026-04-01
+
+### 19.1 Dead code removal in `Meet/OpenAI.ts`
+
+The transport file carries legacy code from the pre-context-chat RAG architecture that is no longer called anywhere.
+
+- [x] Remove `requestArgs` array (lines 12–41) — the two hardcoded third-party proxy endpoints (`aigpt.one`, `theb.ai`) are unused
+- [x] Remove `chatID` mutable variable (line 11) — only referenced by `requestArgs`
+- [x] Remove `RequestArg` type declaration (line 10)
+- [x] Remove `requestFallbackChat()` function — only called from `requestProviderChat()` when no API key is set, routing to the dead `requestArgs[1]` (theb.ai); this path is broken regardless
+- [x] Remove the `requestArgs[1]` fallback branch in `requestProviderChat()` — if no API key is configured, surface an error instead of silently calling a dead endpoint
+- [x] Remove `similaritySearch()` export — not imported anywhere outside this file
+- [x] Remove `OpenAIEmbeddings` class — only used by `similaritySearch()`
+- [x] Remove `langchain/document` import — only used by `similaritySearch()` type signature
+- [x] Remove `supportsEmbeddings()` from `provider.ts` — only caller was deleted `OpenAIEmbeddings`
+
+### 19.2 Dead dependency cleanup in `package.json`
+
+These dependencies were pulled in by the old RAG/embedding pipeline or earlier UI experiments and are no longer imported anywhere in `src/`:
+
+- [x] Remove `langchain` — only import was for `Document` type in dead `similaritySearch`
+- [x] Remove `@pinecone-database/pinecone` — zero imports
+- [x] Remove `chromadb` — zero imports
+- [x] Remove `react-markdown` — zero imports (panel renders markdown via `markdown-it`)
+- [x] Remove `showdown` — zero imports
+- [x] Remove `gpt-3-encoder` — zero imports
+- [x] Remove `pdfreader` — zero imports (PDF extraction uses Zotero's built-in `PDFViewerApplication`)
+- [x] Remove `pdf-parse` — zero imports
+- [x] Remove `htmldiff-js` — zero imports
+- [x] Remove `lighten-darken-color` — zero imports
+- [x] Remove `compute-cosine-similarity` — only import was in dead `similaritySearch`
+- [x] Remove `highlight` / `highlight.js` — zero imports (code highlighting not used in panel render)
+- [x] Run `npm install` after cleanup and verify build still succeeds
+- [x] Check if `@dqbd/tiktoken` is still needed — confirmed no imports; removed
+- [x] Remove `@iktakahiro/markdown-it-katex` and `markdown-it-mathjax3` — not imported; `katex` added as direct dependency
+- [x] Remove `crypto` / `crypto-js` / `blueimp-md5` — only used by dead `similaritySearch`
+- [x] Remove `dotenv` / `node-fetch` / `proxy-agent` — zero imports in `src/`
+- [x] Move `terser` from dependencies to devDependencies (used only by build script)
+- [x] Remove `@types/crypto-js` devDependency
+
+### 19.3 Remove `localStorage.ts`
+
+`src/modules/localStorage.ts` is a legacy JSON-file cache layer. Its only consumer is the dead `similaritySearch()` in `Meet/OpenAI.ts` (via `meetState.storage`).
+
+- [x] Remove `src/modules/localStorage.ts`
+- [x] Remove `storage` field from `Meet/state.ts` (`SonderMeetState.storage`)
+- [x] Remove `meetState.storage` references in `Meet/OpenAI.ts` (already gone after 19.1)
+- [x] Remove `lock` and `input` fields from `Meet/state.ts` (unused after dead code removal)
+
+### 19.4 Split `panel.ts` into smaller modules
+
+`panel.ts` is 2264 lines — a single class doing DOM construction, CSS injection, state management, event handling, rendering, clipboard ops, insight management, and provider configuration. This is the biggest maintainability risk in the codebase.
+
+Suggested decomposition:
+
+- [ ] Extract CSS string into a separate `panel.css.ts` (or `.css` file loaded at build time)
+  - The `installStyle()` method is ~560 lines of template string CSS
+- [ ] Extract `buildPanel()` DOM construction into a `panelDOM.ts` builder module
+  - Returns a typed record of element references instead of assigning 20+ `this.*` fields
+- [ ] Extract history drawer rendering into `panelHistory.ts`
+  - `renderHistory()` is ~230 lines of imperative DOM manipulation with inline event wiring
+- [ ] Extract message rendering into `panelMessages.ts`
+  - `renderMessages()`, `setRawMessageContent()`, `setRenderedMessageContent()`, `getRenderedMessages()`
+- [ ] Extract provider config dialogs into `panelProviderDialogs.ts`
+  - `handleCodexAuth()`, `handleCodexModelConfig()`, `handleCustomApiConfig()` — these are 180+ lines of sequential `window.prompt()`/`window.confirm()` calls
+- [ ] Extract insight save/refresh logic into `panelInsights.ts`
+  - `saveInsightFromMessage()`, `refreshInsightsForCurrentContext()`, `getInsightScopeForContext()`
+- [ ] Keep `ContextChatPanel` as a thin orchestrator that owns state and delegates to submodules
+
+### 19.5 Decouple transport error handling from UI
+
+`requestOpenAIChat()` and `requestCodexChat()` in `Meet/OpenAI.ts` mix transport concerns with presentation:
+
+- [ ] Move `ztoolkit.ProgressWindow` toast calls out of transport functions
+  - Transport should return structured error results, not show toasts
+- [ ] Move markdown-formatted error message construction (`# Error\n> url\n\n...`) out of transport
+  - The caller (`chatService.sendMessage`) should decide how to surface errors
+- [ ] Define a `TransportError` type with `{ status, code, message, url }` fields
+- [ ] Let `panel.ts` or `chatService.ts` be responsible for formatting errors for display
+
+### 19.6 Add streaming abort support
+
+There is no way to cancel a long-running response mid-stream.
+
+- [ ] Thread an `AbortController` through `sendMessage()` → `requestProviderChat()` → HTTP request
+- [ ] Add a `Stop` button in the panel composer that triggers `controller.abort()`
+- [ ] Clean up partial assistant message on abort (either discard or save as incomplete)
+- [ ] Wire the abort signal into `Zotero.HTTP.request()` options (check if Zotero's HTTP API supports abort)
+
+### 19.7 Reduce redundant paper context in multi-turn
+
+Currently the full grounded prompt (paper text + instructions) is injected into the latest user message every turn. Prior turns in `transportHistory` still contain their original grounded text, so the full paper is sent N times for N turns.
+
+- [ ] Investigate using a single system/context message with paper content, and only sending the raw user question in each turn
+  - Blocked by: some providers (Codex) may not support a persistent system message well
+- [ ] At minimum, strip grounded paper content from historical messages before building transport history
+  - Keep only the raw user question in prior turns, inject grounding only in the latest message
+- [ ] Estimate token savings — for a 20-page paper (~40k tokens), a 5-turn conversation currently sends ~200k tokens of paper context
+
+### 19.8 `handlePageRangeConfig()` duplication
+
+The two branches (has range / no range) in `handlePageRangeConfig()` (lines 1285–1336) contain near-identical validation logic.
+
+- [ ] Extract shared range parsing/validation into a helper: `parsePageRangeInput(input: string): PageRange | null`
+- [ ] Reduce the method to a single flow: get current range → prompt → parse → apply or error
+
+### 19.9 Test coverage gaps
+
+Existing tests cover: types/model helpers, SQLite storage CRUD, insight markers, custom API provider helpers. Missing coverage for the most complex and fragile modules:
+
+- [ ] Add tests for `paperRetrieval.ts` — `chunkByPage()`, `chunkByPageFromText()`, `chunkLinesWithPosition()`, `filterChunksByPageRange()`, `buildPaperGroundedUserMessage()`, `buildItemPaperGroundedUserMessage()`
+  - These are pure functions and easy to test
+- [ ] Add tests for `render.ts` — `renderMessageHTML()` with math expressions, code blocks, edge cases
+- [ ] Add tests for `chatMessages.ts` — `toChatHistory()` filtering
+- [ ] Add tests for `Meet/OpenAI.ts` — `parseOpenAIText()`, `parseCodexStream()`, `buildCodexInput()`
+  - Also pure functions, critical for correctness
+- [ ] Add tests for `Meet/CodexOAuth.ts` — `parseAuthorizationInput()`, `getCodexAccountId()`
+
+### 19.10 Minor issues
+
+- [ ] `panel.ts` line 1752: `wrappedJSObject.eval()` for citation jumping — this is a code injection risk if citation data is ever user-controlled; replace with a safer message-passing approach or at least sanitize the page number
+- [ ] `Meet/OpenAI.ts` still references `requestArg.remove` (a regex) in `requestFallbackChat` that is only defined on `requestArgs[0]` — would throw on `requestArgs[1]` if ever called (moot after 19.1 removal)
+- [ ] `todo.md` Phase 6 has unchecked items for citations/formula rendering/cleanup that appear to be done based on the implementation — update checkboxes
+- [x] `Meet/state.ts` `SonderMeetState.lock` and `SonderMeetState.input` fields appear unused outside the dead embedding flow — removed in 19.3
