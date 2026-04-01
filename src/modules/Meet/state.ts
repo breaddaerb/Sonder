@@ -1,7 +1,4 @@
 export interface SonderMeetState {
-  lock?: _ZoteroTypes.PromiseObject;
-  input?: string;
-  storage?: any;
   codexOAuth?: { state: string; verifier: string };
 }
 

@@ -26,10 +26,6 @@ export function setProvider(provider: ProviderID) {
   Zotero.Prefs.set(`${config.addonRef}.provider`, provider);
 }
 
-export function supportsEmbeddings(provider: ProviderID = getProvider()) {
-  return provider === "openai-api";
-}
-
 export function getCurrentModel(provider: ProviderID = getProvider()) {
   if (provider === "openai-codex") {
     return (Zotero.Prefs.get(`${config.addonRef}.codexModel`) as string) || "gpt-5.2";
