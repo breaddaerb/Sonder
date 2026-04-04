@@ -82,6 +82,7 @@ export class ContextChatPanel {
   private composerInput!: HTMLTextAreaElement;
   private composerNote!: HTMLDivElement;
   private sendButton!: HTMLButtonElement;
+  private cancelSend?: () => void;
 
   private state: {
     visible: boolean;
@@ -281,7 +282,7 @@ export class ContextChatPanel {
     composerInput.addEventListener("keydown", (event) => {
       if (event.key == "Enter" && !event.shiftKey) {
         event.preventDefault();
-        void this.handleSend();
+        void this.handleSendOrStop();
       }
     });
 
@@ -295,7 +296,7 @@ export class ContextChatPanel {
     sendButton.className = "sonder-send";
     sendButton.textContent = "Send";
     sendButton.addEventListener("click", () => {
-      void this.handleSend();
+      void this.handleSendOrStop();
     });
 
     composerActions.append(composerNote, sendButton);
@@ -754,6 +755,14 @@ export class ContextChatPanel {
 
   // --- Send ---
 
+  private handleSendOrStop() {
+    if (this.cancelSend) {
+      this.cancelSend();
+      return;
+    }
+    void this.handleSend();
+  }
+
   private async handleSend() {
     const snapshot = this.state.snapshot;
     const content = this.state.draft.trim();
@@ -768,6 +777,7 @@ export class ContextChatPanel {
     this.state.assistantPreviewText = "";
     this.render();
 
+    let cancelled = false;
     try {
       const nextSnapshot = await this.chatService.sendMessage(snapshot.session.id, content, {
         onUserSnapshot: (updatedSnapshot) => {
@@ -782,13 +792,22 @@ export class ContextChatPanel {
           this.setPaperStatus(state.status, state.error);
           this.render();
         },
+        cancellerReceiver: (cancel) => {
+          this.cancelSend = () => { cancelled = true; cancel(); };
+          this.render();
+        },
       }, this.state.pageRange);
       this.state.snapshot = nextSnapshot;
       this.state.assistantPreviewText = "";
     } catch (error: any) {
-      Zotero.logError(error);
-      this.state.error = String(error?.message || error || "Failed to send message.");
+      if (!cancelled) {
+        Zotero.logError(error);
+        this.state.error = String(error?.message || error || "Failed to send message.");
+      }
+      // On cancel: keep the partial preview text visible as the last streamed content,
+      // but don't save it as a message (the request was aborted before completion).
     } finally {
+      this.cancelSend = undefined;
       this.state.loading = false;
       this.state.loadingPhase = undefined;
       this.render();
@@ -897,8 +916,9 @@ export class ContextChatPanel {
           : this.state.paperStatus == "failed"
             ? `Paper preparation failed: ${this.state.paperError || "unknown error"}`
             : `Enter to send · Shift+Enter for newline · View mode: ${this.state.viewMode == "raw" ? "Raw Markdown" : "Preview"}`;
-    this.sendButton.disabled = !hasContext || this.state.loading || !canSendDraft(this.state.draft);
-    this.sendButton.textContent = this.state.loadingPhase == "sending" ? "Sending…" : "Send";
+    const canStop = this.state.loadingPhase == "sending" && Boolean(this.cancelSend);
+    this.sendButton.disabled = canStop ? false : (!hasContext || this.state.loading || !canSendDraft(this.state.draft));
+    this.sendButton.textContent = canStop ? "Stop" : this.state.loadingPhase == "sending" ? "Sending…" : "Send";
   }
 
   private focusComposer() {

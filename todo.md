@@ -638,10 +638,11 @@ Suggested decomposition:
 
 There is no way to cancel a long-running response mid-stream.
 
-- [ ] Thread an `AbortController` through `sendMessage()` → `requestProviderChat()` → HTTP request
-- [ ] Add a `Stop` button in the panel composer that triggers `controller.abort()`
-- [ ] Clean up partial assistant message on abort (either discard or save as incomplete)
-- [ ] Wire the abort signal into `Zotero.HTTP.request()` options (check if Zotero's HTTP API supports abort)
+- [x] Thread a `cancellerReceiver` callback through `sendMessage()` → `requestProviderChat()` → `requestObserver` in `Zotero.HTTP.request()`
+  - Zotero's HTTP API uses `requestObserver` giving access to XMLHttpRequest; `xmlhttp.abort()` is called on cancel
+- [x] Send button becomes "Stop" during streaming; Enter key also triggers stop
+- [x] On cancel: partial preview text stays visible, error is suppressed, no assistant message is saved
+- [x] Wired via `cancellerReceiver` pattern (Zotero doesn't support AbortController natively)
 
 ### 19.7 Reduce redundant paper context in multi-turn
 
