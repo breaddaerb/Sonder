@@ -161,6 +161,9 @@ async function requestOpenAIChat(
         }),
         responseType: "text",
         requestObserver: (xmlhttp: XMLHttpRequest) => {
+          if (options.cancellerReceiver) {
+            options.cancellerReceiver(() => xmlhttp.abort());
+          }
           xmlhttp.onprogress = (e: any) => {
             responseText = parseOpenAIText(e.target.response)
             options.onText?.(responseText)
@@ -221,6 +224,9 @@ async function requestCodexChat(
         }),
         responseType: "text",
         requestObserver: (xmlhttp: XMLHttpRequest) => {
+          if (options.cancellerReceiver) {
+            options.cancellerReceiver(() => xmlhttp.abort());
+          }
           xmlhttp.onprogress = (e: any) => {
             const parsed = parseCodexStream(e.target.response)
             responseText = parsed.errorText || parsed.text

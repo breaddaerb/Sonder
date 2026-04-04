@@ -24,6 +24,8 @@ export interface SendMessageCallbacks {
   onUserSnapshot?: (snapshot: SessionSnapshot) => void;
   onAssistantDelta?: (text: string) => void;
   onPaperStatusChange?: (state: PaperContextState) => void;
+  /** Receives a function that cancels the in-flight request when called. */
+  cancellerReceiver?: (cancel: () => void) => void;
 }
 
 export class ContextChatService {
@@ -179,6 +181,7 @@ export class ContextChatService {
       onText(text) {
         callbacks.onAssistantDelta?.(text);
       },
+      cancellerReceiver: callbacks.cancellerReceiver,
     });
 
     snapshot = await this.store.appendMessage(sessionId, "assistant", result.content, {
