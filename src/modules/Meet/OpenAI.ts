@@ -108,6 +108,8 @@ export type TransportChatMessage = { role: "user" | "assistant"; content: string
 
 export type TransportChatOptions = {
   onText?: (text: string) => void;
+  /** System-level context pinned at the start of the request to enable prefix caching. */
+  systemMessage?: string;
 };
 
 export interface TransportError {
@@ -137,6 +139,11 @@ async function requestOpenAIChat(
   const chatNumber = Zotero.Prefs.get(`${config.addonRef}.chatNumber`) as number
   const url = `${api}/chat/completions`
   let responseText = ""
+  const transportMessages: { role: string; content: string }[] = [];
+  if (options.systemMessage) {
+    transportMessages.push({ role: "system", content: options.systemMessage });
+  }
+  transportMessages.push(...messages.slice(-chatNumber));
   try {
     await Zotero.HTTP.request(
       "POST",
@@ -148,7 +155,7 @@ async function requestOpenAIChat(
         },
         body: JSON.stringify({
           model,
-          messages: messages.slice(-chatNumber),
+          messages: transportMessages,
           stream: true,
           temperature: Number(temperature),
         }),
@@ -189,6 +196,9 @@ async function requestCodexChat(
   let responseText = ""
   try {
     const credentials = await getValidCodexAccessToken()
+    const codexInstructions = options.systemMessage
+      ? `${CODEX_INSTRUCTIONS}\n\n${options.systemMessage}`
+      : CODEX_INSTRUCTIONS;
     await Zotero.HTTP.request(
       "POST",
       CODEX_BASE_URL,
@@ -205,7 +215,7 @@ async function requestCodexChat(
           model,
           store: false,
           stream: true,
-          instructions: CODEX_INSTRUCTIONS,
+          instructions: codexInstructions,
           input: buildCodexInput(messages.slice(-chatNumber)),
           text: { verbosity: "medium" },
         }),

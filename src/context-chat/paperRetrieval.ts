@@ -286,25 +286,70 @@ export function createPaperChunkCitations(chunks: PaperChunk[], originalIndices?
   });
 }
 
+const FORMAT_INSTRUCTIONS = [
+  "When referring to specific parts of the paper, cite page numbers like [1] or [2] (these correspond to the numbered sections below).",
+  "Format the answer in clean markdown that stays easy to read and easy to copy into tools like Notion.",
+  "Use headings/lists/tables when helpful. Use fenced code blocks for code.",
+  "For math, prefer standard markdown math delimiters: use $...$ for inline equations and $...$ for standalone block equations.",
+  "Avoid mixing prose and bare un-delimited LaTeX when proper math delimiters can be used.",
+].join("\n");
+
+function buildChunkContextText(chunks: PaperChunk[]) {
+  return chunks.length > 0
+    ? chunks.map((chunk, index) => `[${index + 1}] (${chunk.label}) ${chunk.content}`).join("\n\n")
+    : "(No paper content was extracted.)";
+}
+
+/**
+ * Build a system-level message containing paper context and instructions.
+ * This should be pinned at the start of every request to enable prompt prefix caching.
+ */
+export function buildPaperSystemMessage(args: {
+  title: string;
+  chunks: PaperChunk[];
+}) {
+  return [
+    `You are helping the user chat with the paper titled: ${args.title}`,
+    "The complete paper text is provided below (one section per page). Use it as your primary grounding for factual claims about the paper.",
+    FORMAT_INSTRUCTIONS,
+    "",
+    "Full paper content:",
+    buildChunkContextText(args.chunks),
+  ].join("\n");
+}
+
+/**
+ * Build a system-level message for item+paper context.
+ * Includes the selected annotation/note as primary anchor plus the full paper.
+ */
+export function buildItemPaperSystemMessage(args: {
+  paperTitle: string;
+  itemKind: "annotation" | "note";
+  itemText: string;
+  chunks: PaperChunk[];
+}) {
+  const itemLabel = args.itemKind == "annotation" ? "Selected annotation" : "Selected note";
+  return [
+    `You are helping the user chat with a selected ${args.itemKind} from the paper titled: ${args.paperTitle}`,
+    `${itemLabel} (must be treated as primary anchor):`,
+    args.itemText,
+    "",
+    "Always address the selected item directly first, then use the full paper content as supplementary evidence.",
+    "The selected item content is mandatory context and must never be ignored.",
+    FORMAT_INSTRUCTIONS,
+    "",
+    "Full paper content:",
+    buildChunkContextText(args.chunks),
+  ].join("\n");
+}
+
 export function buildPaperGroundedUserMessage(args: {
   title: string;
   question: string;
   chunks: PaperChunk[];
 }) {
-  const contextText = args.chunks.length > 0
-    ? args.chunks.map((chunk, index) => `[${index + 1}] (${chunk.label}) ${chunk.content}`).join("\n\n")
-    : "(No paper content was extracted.)";
   return [
-    `You are helping the user chat with the paper titled: ${args.title}`,
-    "The complete paper text is provided below (one section per page). Use it as your primary grounding for factual claims about the paper.",
-    "When referring to specific parts of the paper, cite page numbers like [1] or [2] (these correspond to the numbered sections below).",
-    "Format the answer in clean markdown that stays easy to read and easy to copy into tools like Notion.",
-    "Use headings/lists/tables when helpful. Use fenced code blocks for code.",
-    "For math, prefer standard markdown math delimiters: use $...$ for inline equations and $...$ for standalone block equations.",
-    "Avoid mixing prose and bare un-delimited LaTeX when proper math delimiters can be used.",
-    "",
-    "Full paper content:",
-    contextText,
+    buildPaperSystemMessage({ title: args.title, chunks: args.chunks }),
     "",
     `User question: ${args.question}`,
   ].join("\n");
@@ -317,24 +362,13 @@ export function buildItemPaperGroundedUserMessage(args: {
   question: string;
   chunks: PaperChunk[];
 }) {
-  const contextText = args.chunks.length > 0
-    ? args.chunks.map((chunk, index) => `[${index + 1}] (${chunk.label}) ${chunk.content}`).join("\n\n")
-    : "(No paper content was extracted.)";
-  const itemLabel = args.itemKind == "annotation" ? "Selected annotation" : "Selected note";
   return [
-    `You are helping the user chat with a selected ${args.itemKind} from the paper titled: ${args.paperTitle}`,
-    `${itemLabel} (must be treated as primary anchor):`,
-    args.itemText,
-    "",
-    "Always address the selected item directly first, then use the full paper content as supplementary evidence.",
-    "The selected item content is mandatory context and must never be ignored.",
-    "When referring to specific parts of the paper, cite page numbers like [1] or [2] (these correspond to the numbered sections below).",
-    "Format the answer in clean markdown that stays easy to read and easy to copy into tools like Notion.",
-    "Use headings/lists/tables when helpful. Use fenced code blocks for code.",
-    "For math, prefer standard markdown math delimiters: use $...$ for inline equations and $...$ for standalone block equations.",
-    "",
-    "Full paper content:",
-    contextText,
+    buildItemPaperSystemMessage({
+      paperTitle: args.paperTitle,
+      itemKind: args.itemKind,
+      itemText: args.itemText,
+      chunks: args.chunks,
+    }),
     "",
     `User question: ${args.question}`,
   ].join("\n");

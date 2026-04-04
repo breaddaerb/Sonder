@@ -11,6 +11,7 @@ const TEST_FILES = [
   "custom-api-provider.test.ts",
   "transport-parsing.test.ts",
   "codex-oauth-parsing.test.ts",
+  "system-message-caching.test.ts",
 ];
 
 async function runTestFile(testFile) {
