@@ -492,10 +492,10 @@ Recommended sequence for happy coding:
 - [x] new session flow
 
 ### Phase 6: polish
-- [ ] citations/source jumps
-- [ ] formula rendering
+- [x] citations/source jumps
+- [x] formula rendering
 - [x] legacy tag de-emphasis
-- [ ] cleanup inherited warnings/hacks
+- [x] cleanup inherited warnings/hacks
 
 ---
 
@@ -614,39 +614,35 @@ These dependencies were pulled in by the old RAG/embedding pipeline or earlier U
 
 Suggested decomposition:
 
-- [ ] Extract CSS string into a separate `panel.css.ts` (or `.css` file loaded at build time)
-  - The `installStyle()` method is ~560 lines of template string CSS
+- [x] Extract CSS string into `panelCSS.ts` (562 lines)
 - [ ] Extract `buildPanel()` DOM construction into a `panelDOM.ts` builder module
   - Returns a typed record of element references instead of assigning 20+ `this.*` fields
-- [ ] Extract history drawer rendering into `panelHistory.ts`
-  - `renderHistory()` is ~230 lines of imperative DOM manipulation with inline event wiring
-- [ ] Extract message rendering into `panelMessages.ts`
-  - `renderMessages()`, `setRawMessageContent()`, `setRenderedMessageContent()`, `getRenderedMessages()`
-- [ ] Extract provider config dialogs into `panelProviderDialogs.ts`
-  - `handleCodexAuth()`, `handleCodexModelConfig()`, `handleCustomApiConfig()` — these are 180+ lines of sequential `window.prompt()`/`window.confirm()` calls
-- [ ] Extract insight save/refresh logic into `panelInsights.ts`
-  - `saveInsightFromMessage()`, `refreshInsightsForCurrentContext()`, `getInsightScopeForContext()`
-- [ ] Keep `ContextChatPanel` as a thin orchestrator that owns state and delegates to submodules
+- [x] Extract history drawer rendering into `panelHistory.ts` (263 lines)
+- [x] Extract message rendering into `panelMessages.ts` (210 lines)
+- [x] Extract provider config dialogs into `panelProviderDialogs.ts` (202 lines)
+- [x] Extract insight save/refresh logic into `panelInsights.ts` (145 lines)
+- [x] `ContextChatPanel` is now a thin orchestrator (1086 lines, down from 2264)
 
 ### 19.5 Decouple transport error handling from UI
 
 `requestOpenAIChat()` and `requestCodexChat()` in `Meet/OpenAI.ts` mix transport concerns with presentation:
 
-- [ ] Move `ztoolkit.ProgressWindow` toast calls out of transport functions
-  - Transport should return structured error results, not show toasts
-- [ ] Move markdown-formatted error message construction (`# Error\n> url\n\n...`) out of transport
-  - The caller (`chatService.sendMessage`) should decide how to surface errors
-- [ ] Define a `TransportError` type with `{ status, code, message, url }` fields
-- [ ] Let `panel.ts` or `chatService.ts` be responsible for formatting errors for display
+- [x] Move `ztoolkit.ProgressWindow` toast calls out of transport functions
+  - Transport now returns structured `TransportError` on `result.error`
+- [x] Move markdown-formatted error message construction out of transport
+  - `formatTransportError()` is exported for callers that want the markdown format
+- [x] Define a `TransportError` type with `{ status, code, type, message, url }` fields
+- [x] Let callers be responsible for formatting/displaying errors
 
 ### 19.6 Add streaming abort support
 
 There is no way to cancel a long-running response mid-stream.
 
-- [ ] Thread an `AbortController` through `sendMessage()` → `requestProviderChat()` → HTTP request
-- [ ] Add a `Stop` button in the panel composer that triggers `controller.abort()`
-- [ ] Clean up partial assistant message on abort (either discard or save as incomplete)
-- [ ] Wire the abort signal into `Zotero.HTTP.request()` options (check if Zotero's HTTP API supports abort)
+- [x] Thread a `cancellerReceiver` callback through `sendMessage()` → `requestProviderChat()` → `requestObserver` in `Zotero.HTTP.request()`
+  - Zotero's HTTP API uses `requestObserver` giving access to XMLHttpRequest; `xmlhttp.abort()` is called on cancel
+- [x] Send button becomes "Stop" during streaming; Enter key also triggers stop
+- [x] On cancel: partial preview text stays visible, error is suppressed, no assistant message is saved
+- [x] Wired via `cancellerReceiver` pattern (Zotero doesn't support AbortController natively)
 
 ### 19.7 Reduce redundant paper context in multi-turn
 
@@ -662,24 +658,23 @@ Currently the full grounded prompt (paper text + instructions) is injected into 
 
 The two branches (has range / no range) in `handlePageRangeConfig()` (lines 1285–1336) contain near-identical validation logic.
 
-- [ ] Extract shared range parsing/validation into a helper: `parsePageRangeInput(input: string): PageRange | null`
-- [ ] Reduce the method to a single flow: get current range → prompt → parse → apply or error
+- [x] Extract shared range parsing/validation into `parsePageRangeInput(input: string): PageRange | undefined`
+- [x] Reduce the method to a single flow: get current range → prompt → parse → apply or error
 
 ### 19.9 Test coverage gaps
 
 Existing tests cover: types/model helpers, SQLite storage CRUD, insight markers, custom API provider helpers. Missing coverage for the most complex and fragile modules:
 
-- [ ] Add tests for `paperRetrieval.ts` — `chunkByPage()`, `chunkByPageFromText()`, `chunkLinesWithPosition()`, `filterChunksByPageRange()`, `buildPaperGroundedUserMessage()`, `buildItemPaperGroundedUserMessage()`
-  - These are pure functions and easy to test
-- [ ] Add tests for `render.ts` — `renderMessageHTML()` with math expressions, code blocks, edge cases
-- [ ] Add tests for `chatMessages.ts` — `toChatHistory()` filtering
-- [ ] Add tests for `Meet/OpenAI.ts` — `parseOpenAIText()`, `parseCodexStream()`, `buildCodexInput()`
-  - Also pure functions, critical for correctness
-- [ ] Add tests for `Meet/CodexOAuth.ts` — `parseAuthorizationInput()`, `getCodexAccountId()`
+- [x] Tests for `paperRetrieval.ts` — already covered in `context-chat-model.test.ts`
+- [x] Tests for `render.ts` — already covered in `context-chat-model.test.ts`
+- [x] Tests for `chatMessages.ts` — already covered in `context-chat-model.test.ts`
+- [x] Add tests for `Meet/OpenAI.ts` — `parseOpenAIText()`, `parseCodexStream()`, `buildCodexInput()`, `formatTransportError()` in `transport-parsing.test.ts`
+- [x] Add tests for `Meet/CodexOAuth.ts` — `parseAuthorizationInput()` in `codex-oauth-parsing.test.ts`
+  - `getCodexAccountId()` uses `window.atob` (browser-only), skipped in Node tests
 
 ### 19.10 Minor issues
 
-- [ ] `panel.ts` line 1752: `wrappedJSObject.eval()` for citation jumping — this is a code injection risk if citation data is ever user-controlled; replace with a safer message-passing approach or at least sanitize the page number
-- [ ] `Meet/OpenAI.ts` still references `requestArg.remove` (a regex) in `requestFallbackChat` that is only defined on `requestArgs[0]` — would throw on `requestArgs[1]` if ever called (moot after 19.1 removal)
-- [ ] `todo.md` Phase 6 has unchecked items for citations/formula rendering/cleanup that appear to be done based on the implementation — update checkboxes
+- [x] `panel.ts`: replaced `wrappedJSObject.eval()` citation jump with direct property access on `PDFViewerApplication`
+- [x] `Meet/OpenAI.ts` `requestArg.remove` issue — moot, removed in 19.1
+- [x] `todo.md` Phase 6 stale checkboxes — updated
 - [x] `Meet/state.ts` `SonderMeetState.lock` and `SonderMeetState.input` fields appear unused outside the dead embedding flow — removed in 19.3

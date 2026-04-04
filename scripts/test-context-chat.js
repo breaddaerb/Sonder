@@ -9,6 +9,8 @@ const TEST_FILES = [
   "context-chat-storage-sqlite.test.ts",
   "context-chat-insight-marker.test.ts",
   "custom-api-provider.test.ts",
+  "transport-parsing.test.ts",
+  "codex-oauth-parsing.test.ts",
 ];
 
 async function runTestFile(testFile) {
