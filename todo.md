@@ -614,19 +614,14 @@ These dependencies were pulled in by the old RAG/embedding pipeline or earlier U
 
 Suggested decomposition:
 
-- [ ] Extract CSS string into a separate `panel.css.ts` (or `.css` file loaded at build time)
-  - The `installStyle()` method is ~560 lines of template string CSS
+- [x] Extract CSS string into `panelCSS.ts` (562 lines)
 - [ ] Extract `buildPanel()` DOM construction into a `panelDOM.ts` builder module
   - Returns a typed record of element references instead of assigning 20+ `this.*` fields
-- [ ] Extract history drawer rendering into `panelHistory.ts`
-  - `renderHistory()` is ~230 lines of imperative DOM manipulation with inline event wiring
-- [ ] Extract message rendering into `panelMessages.ts`
-  - `renderMessages()`, `setRawMessageContent()`, `setRenderedMessageContent()`, `getRenderedMessages()`
-- [ ] Extract provider config dialogs into `panelProviderDialogs.ts`
-  - `handleCodexAuth()`, `handleCodexModelConfig()`, `handleCustomApiConfig()` — these are 180+ lines of sequential `window.prompt()`/`window.confirm()` calls
-- [ ] Extract insight save/refresh logic into `panelInsights.ts`
-  - `saveInsightFromMessage()`, `refreshInsightsForCurrentContext()`, `getInsightScopeForContext()`
-- [ ] Keep `ContextChatPanel` as a thin orchestrator that owns state and delegates to submodules
+- [x] Extract history drawer rendering into `panelHistory.ts` (263 lines)
+- [x] Extract message rendering into `panelMessages.ts` (210 lines)
+- [x] Extract provider config dialogs into `panelProviderDialogs.ts` (202 lines)
+- [x] Extract insight save/refresh logic into `panelInsights.ts` (145 lines)
+- [x] `ContextChatPanel` is now a thin orchestrator (1086 lines, down from 2264)
 
 ### 19.5 Decouple transport error handling from UI
 
