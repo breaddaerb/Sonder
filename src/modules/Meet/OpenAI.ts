@@ -110,6 +110,8 @@ export type TransportChatOptions = {
   onText?: (text: string) => void;
   /** System-level context pinned at the start of the request to enable prefix caching. */
   systemMessage?: string;
+  /** Receives a function that, when called, cancels the in-flight HTTP request. */
+  cancellerReceiver?: (cancel: () => void) => void;
 };
 
 export interface TransportError {
