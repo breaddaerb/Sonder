@@ -644,15 +644,23 @@ There is no way to cancel a long-running response mid-stream.
 - [x] On cancel: partial preview text stays visible, error is suppressed, no assistant message is saved
 - [x] Wired via `cancellerReceiver` pattern (Zotero doesn't support AbortController natively)
 
-### 19.7 Reduce redundant paper context in multi-turn
+### 19.7 Enable prompt prefix caching via system message
 
-Currently the full grounded prompt (paper text + instructions) is injected into the latest user message every turn. Prior turns in `transportHistory` still contain their original grounded text, so the full paper is sent N times for N turns.
+OpenAI automatically caches the leading token prefix of each request (>= 1024 tokens, 50% cost, ~80% latency reduction). Currently the paper context + formatting instructions are embedded in the last user message, which shifts position every turn — the prefix changes and cache never hits.
 
-- [ ] Investigate using a single system/context message with paper content, and only sending the raw user question in each turn
-  - Blocked by: some providers (Codex) may not support a persistent system message well
-- [ ] At minimum, strip grounded paper content from historical messages before building transport history
-  - Keep only the raw user question in prior turns, inject grounding only in the latest message
-- [ ] Estimate token savings — for a 20-page paper (~40k tokens), a 5-turn conversation currently sends ~200k tokens of paper context
+Fix: pin paper context + instructions as the stable prefix at the start of every request:
+- **Standard API**: prepend a `system` message containing instructions + paper context
+- **Codex API**: append paper context to the `instructions` field (already the prefix)
+
+User messages become raw questions only. The prefix stays identical across turns → cache hits on turn 2+.
+
+- [x] Build `buildPaperSystemMessage` / `buildItemPaperSystemMessage` for system-level content
+- [x] For openai-api: prepend as `{ role: "system", content: ... }` in transport messages
+- [x] For openai-codex: append paper context to the `instructions` field in the request body
+- [x] User messages are now raw questions — no more grounding injection
+- [x] `buildTransportHistory` simplified — no longer replaces last user message
+- [x] Backward compat: `buildPaperGroundedUserMessage` / `buildItemPaperGroundedUserMessage` still work (compose from system + question)
+- [x] Tests: system message content, prefix identity across turns, backward compat (`system-message-caching.test.ts`)
 
 ### 19.8 `handlePageRangeConfig()` duplication
 

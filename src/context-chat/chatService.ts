@@ -3,8 +3,8 @@ import { getCurrentModel, getProvider } from "../modules/provider";
 import ContextChatStore from "./storage";
 import { toChatHistory } from "./chatMessages";
 import {
-  buildItemPaperGroundedUserMessage,
-  buildPaperGroundedUserMessage,
+  buildItemPaperSystemMessage,
+  buildPaperSystemMessage,
   createPaperChunkCitations,
   filterChunksByPageRange,
   parseCitedIndices,
@@ -104,13 +104,8 @@ export class ContextChatService {
     return await promise;
   }
 
-  private buildTransportHistory(snapshot: SessionSnapshot, latestUserContent: string) {
-    const history = toChatHistory(snapshot.messages) as TransportChatMessage[];
-    const lastMessage = history[history.length - 1];
-    if (lastMessage?.role == "user") {
-      lastMessage.content = latestUserContent;
-    }
-    return history;
+  private buildTransportHistory(snapshot: SessionSnapshot) {
+    return toChatHistory(snapshot.messages) as TransportChatMessage[];
   }
 
   private buildAssistantCitations(
@@ -167,22 +162,22 @@ export class ContextChatService {
     // Send all paper chunks (one per page/part), optionally filtered by page range.
     const contextChunks = filterChunksByPageRange(preparedPaper.chunks, pageRange);
 
-    const groundedUserMessage = snapshot.context.type == "item+paper"
-      ? buildItemPaperGroundedUserMessage({
+    // Build system-level context pinned at the start of the request for prefix caching.
+    const systemMessage = snapshot.context.type == "item+paper"
+      ? buildItemPaperSystemMessage({
           paperTitle: preparedPaper.title,
           itemKind: snapshot.context.itemKind || "annotation",
           itemText: snapshot.context.itemText || "(Selected item content unavailable)",
-          question: content,
           chunks: contextChunks,
         })
-      : buildPaperGroundedUserMessage({
+      : buildPaperSystemMessage({
           title: preparedPaper.title,
-          question: content,
           chunks: contextChunks,
         });
-    const transportHistory = this.buildTransportHistory(snapshot, groundedUserMessage);
+    const transportHistory = this.buildTransportHistory(snapshot);
 
     const result = await requestProviderChat(transportHistory, {
+      systemMessage,
       onText(text) {
         callbacks.onAssistantDelta?.(text);
       },
