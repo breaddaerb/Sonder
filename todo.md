@@ -492,10 +492,10 @@ Recommended sequence for happy coding:
 - [x] new session flow
 
 ### Phase 6: polish
-- [ ] citations/source jumps
-- [ ] formula rendering
+- [x] citations/source jumps
+- [x] formula rendering
 - [x] legacy tag de-emphasis
-- [ ] cleanup inherited warnings/hacks
+- [x] cleanup inherited warnings/hacks
 
 ---
 
@@ -627,12 +627,12 @@ Suggested decomposition:
 
 `requestOpenAIChat()` and `requestCodexChat()` in `Meet/OpenAI.ts` mix transport concerns with presentation:
 
-- [ ] Move `ztoolkit.ProgressWindow` toast calls out of transport functions
-  - Transport should return structured error results, not show toasts
-- [ ] Move markdown-formatted error message construction (`# Error\n> url\n\n...`) out of transport
-  - The caller (`chatService.sendMessage`) should decide how to surface errors
-- [ ] Define a `TransportError` type with `{ status, code, message, url }` fields
-- [ ] Let `panel.ts` or `chatService.ts` be responsible for formatting errors for display
+- [x] Move `ztoolkit.ProgressWindow` toast calls out of transport functions
+  - Transport now returns structured `TransportError` on `result.error`
+- [x] Move markdown-formatted error message construction out of transport
+  - `formatTransportError()` is exported for callers that want the markdown format
+- [x] Define a `TransportError` type with `{ status, code, type, message, url }` fields
+- [x] Let callers be responsible for formatting/displaying errors
 
 ### 19.6 Add streaming abort support
 
@@ -657,8 +657,8 @@ Currently the full grounded prompt (paper text + instructions) is injected into 
 
 The two branches (has range / no range) in `handlePageRangeConfig()` (lines 1285–1336) contain near-identical validation logic.
 
-- [ ] Extract shared range parsing/validation into a helper: `parsePageRangeInput(input: string): PageRange | null`
-- [ ] Reduce the method to a single flow: get current range → prompt → parse → apply or error
+- [x] Extract shared range parsing/validation into `parsePageRangeInput(input: string): PageRange | undefined`
+- [x] Reduce the method to a single flow: get current range → prompt → parse → apply or error
 
 ### 19.9 Test coverage gaps
 
@@ -674,7 +674,7 @@ Existing tests cover: types/model helpers, SQLite storage CRUD, insight markers,
 
 ### 19.10 Minor issues
 
-- [ ] `panel.ts` line 1752: `wrappedJSObject.eval()` for citation jumping — this is a code injection risk if citation data is ever user-controlled; replace with a safer message-passing approach or at least sanitize the page number
-- [ ] `Meet/OpenAI.ts` still references `requestArg.remove` (a regex) in `requestFallbackChat` that is only defined on `requestArgs[0]` — would throw on `requestArgs[1]` if ever called (moot after 19.1 removal)
-- [ ] `todo.md` Phase 6 has unchecked items for citations/formula rendering/cleanup that appear to be done based on the implementation — update checkboxes
+- [x] `panel.ts`: replaced `wrappedJSObject.eval()` citation jump with direct property access on `PDFViewerApplication`
+- [x] `Meet/OpenAI.ts` `requestArg.remove` issue — moot, removed in 19.1
+- [x] `todo.md` Phase 6 stale checkboxes — updated
 - [x] `Meet/state.ts` `SonderMeetState.lock` and `SonderMeetState.input` fields appear unused outside the dead embedding flow — removed in 19.3

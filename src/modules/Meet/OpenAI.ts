@@ -77,16 +77,31 @@ function buildCodexInput(messages: { role: "user" | "assistant"; content: string
   })
 }
 
-function formatCodexError(error: any) {
-  const status = error?.status || error?.xmlhttp?.status
-  const body = error?.xmlhttp?.responseText || error?.xmlhttp?.response || error?.message || "Unknown error"
-  let message = body
-  try {
-    const parsed = JSON.parse(body)
-    message = parsed?.error?.message || parsed?.message || body
-  } catch { }
-  const title = status ? `Codex ${status}` : "Codex Error"
-  return `# ${title}\n> ${CODEX_BASE_URL}\n\n${message}`
+function parseHttpError(error: any, url: string): TransportError {
+  const status = error?.status || error?.xmlhttp?.status || undefined;
+  const body = error?.xmlhttp?.response || error?.xmlhttp?.responseText;
+  let code: string | undefined;
+  let type: string | undefined;
+  let message = error?.message || "Unknown error";
+  if (body) {
+    const raw = typeof body === "object" ? JSON.stringify(body) : String(body || "");
+    try {
+      const parsed = JSON.parse(raw);
+      const err = parsed?.error || parsed;
+      code = err.code || undefined;
+      type = err.type || undefined;
+      message = err.message || raw || message;
+    } catch {
+      // keep original message
+    }
+  }
+  return { status, code, type, message, url };
+}
+
+export function formatTransportError(error: TransportError): string {
+  const title = error.code || (error.status ? `Error ${error.status}` : "Error");
+  const typeStr = error.type ? `**${error.type}**\n` : "";
+  return `# ${title}\n> ${error.url || "unknown"}\n\n${typeStr}${error.message}`;
 }
 
 export type TransportChatMessage = { role: "user" | "assistant"; content: string };
@@ -95,10 +110,19 @@ export type TransportChatOptions = {
   onText?: (text: string) => void;
 };
 
+export interface TransportError {
+  status?: number;
+  code?: string;
+  type?: string;
+  message: string;
+  url?: string;
+}
+
 export type TransportChatResult = {
   provider: ReturnType<typeof getProvider>;
   model: string;
   content: string;
+  error?: TransportError;
 };
 
 async function requestOpenAIChat(
@@ -141,21 +165,12 @@ async function requestOpenAIChat(
       }
     );
   } catch (error: any) {
-    try {
-      const body = error?.xmlhttp?.response || error?.xmlhttp?.responseText;
-      const raw = typeof body === "object" ? JSON.stringify(body) : String(body || "");
-      let parsed: any;
-      try { parsed = JSON.parse(raw); } catch { parsed = {}; }
-      const err = parsed?.error || parsed;
-      responseText = `# ${err.code || "Error"}\n> ${url}\n\n**${err.type || "request_error"}**\n${err.message || raw || error?.message || "Unknown error"}`
-      new ztoolkit.ProgressWindow(err.code || "Error", { closeOtherProgressWindows: true })
-        .createLine({ text: err.message || "Request failed.", type: "default" })
-        .show()
-    } catch {
-      responseText = `# Error\n> ${url}\n\n${error?.message || "Unknown error"}`
-      new ztoolkit.ProgressWindow("Error", { closeOtherProgressWindows: true })
-        .createLine({ text: error?.message || "Unknown error", type: "default" })
-        .show()
+    const transportError = parseHttpError(error, url);
+    return {
+      provider: "openai-api",
+      model,
+      content: responseText || formatTransportError(transportError),
+      error: transportError,
     }
   }
   return {
@@ -208,10 +223,13 @@ async function requestCodexChat(
       }
     )
   } catch (error: any) {
-    responseText = formatCodexError(error)
-    new ztoolkit.ProgressWindow("Codex", { closeOtherProgressWindows: true })
-      .createLine({ text: error?.message || "Codex request failed.", type: "default" })
-      .show()
+    const transportError = parseHttpError(error, CODEX_BASE_URL);
+    return {
+      provider: "openai-codex",
+      model,
+      content: responseText || formatTransportError(transportError),
+      error: transportError,
+    }
   }
   return {
     provider: "openai-codex",

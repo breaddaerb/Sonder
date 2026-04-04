@@ -27,6 +27,19 @@ function formatTimestamp(timestamp: number) {
   }).format(new Date(timestamp));
 }
 
+function parsePageRangeInput(input: string): PageRange | undefined {
+  const match = input.match(/^(\d+)\s*[-–]\s*(\d+)$/);
+  if (!match) {
+    return undefined;
+  }
+  const startPage = Number(match[1]);
+  const endPage = Number(match[2]);
+  if (startPage < 1 || endPage < startPage) {
+    return undefined;
+  }
+  return { startPage, endPage };
+}
+
 const PANEL_WIDTH_STORAGE_KEY = "sonder.contextChat.panelWidth";
 
 export class ContextChatPanel {
@@ -593,54 +606,31 @@ export class ContextChatPanel {
   }
 
   private handlePageRangeConfig() {
-    if (this.state.pageRange) {
-      const input = this.ownerWindow.prompt(
-        `Current page range: ${this.state.pageRange.startPage}-${this.state.pageRange.endPage}\n\nEnter a new page range (e.g., "1-8") or leave empty to send all pages:`,
-        `${this.state.pageRange.startPage}-${this.state.pageRange.endPage}`,
-      );
-      if (input === null) {
-        return;
-      }
-      const trimmed = input.trim();
-      if (!trimmed) {
+    const current = this.state.pageRange;
+    const promptMessage = current
+      ? `Current page range: ${current.startPage}-${current.endPage}\n\nEnter a new page range (e.g., "1-8") or leave empty to send all pages:`
+      : 'All pages are sent to the model by default.\n\nTo limit context to specific pages (e.g., exclude references), enter a page range like "1-8".\nLeave empty to keep sending all pages:';
+    const defaultValue = current ? `${current.startPage}-${current.endPage}` : undefined;
+
+    const input = this.ownerWindow.prompt(promptMessage, defaultValue);
+    if (input === null) {
+      return;
+    }
+    const trimmed = input.trim();
+    if (!trimmed) {
+      if (current) {
         this.state.pageRange = undefined;
         this.render();
-        return;
       }
-      const match = trimmed.match(/^(\d+)\s*[-–]\s*(\d+)$/);
-      if (!match) {
-        this.ownerWindow.alert('Invalid format. Use "start-end" (e.g., "1-8").');
-        return;
-      }
-      const startPage = Number(match[1]);
-      const endPage = Number(match[2]);
-      if (startPage < 1 || endPage < startPage) {
-        this.ownerWindow.alert("Invalid range. Start page must be >= 1 and end page must be >= start page.");
-        return;
-      }
-      this.state.pageRange = { startPage, endPage };
-      this.render();
-    } else {
-      const input = this.ownerWindow.prompt(
-        'All pages are sent to the model by default.\n\nTo limit context to specific pages (e.g., exclude references), enter a page range like "1-8".\nLeave empty to keep sending all pages:',
-      );
-      if (input === null || !input.trim()) {
-        return;
-      }
-      const match = input.trim().match(/^(\d+)\s*[-–]\s*(\d+)$/);
-      if (!match) {
-        this.ownerWindow.alert('Invalid format. Use "start-end" (e.g., "1-8").');
-        return;
-      }
-      const startPage = Number(match[1]);
-      const endPage = Number(match[2]);
-      if (startPage < 1 || endPage < startPage) {
-        this.ownerWindow.alert("Invalid range. Start page must be >= 1 and end page must be >= start page.");
-        return;
-      }
-      this.state.pageRange = { startPage, endPage };
-      this.render();
+      return;
     }
+    const parsed = parsePageRangeInput(trimmed);
+    if (!parsed) {
+      this.ownerWindow.alert('Invalid format. Use "start-end" (e.g., "1-8"). Start page must be >= 1 and end page must be >= start page.');
+      return;
+    }
+    this.state.pageRange = parsed;
+    this.render();
   }
 
   // --- History session rename/delete ---
@@ -834,19 +824,17 @@ export class ContextChatPanel {
       if (!reader?._iframeWindow) {
         throw new Error("No active PDF reader is available for citation jump.");
       }
-      const yPos = citation.yOffset ?? "null";
-      (reader._iframeWindow as any).wrappedJSObject.eval(`
-        (() => {
-          const viewer = PDFViewerApplication.pdfViewer;
-          PDFViewerApplication.page = ${resolvedPage};
-          viewer.scrollPageIntoView({
-            pageNumber: ${resolvedPage},
-            destArray: [null, { name: "XYZ" }, 0, ${yPos}, null],
-            allowNegativeOffset: false,
-            ignoreDestinationZoom: false
-          });
-        })()
-      `);
+      const pdfApp = (reader._iframeWindow as any).wrappedJSObject.PDFViewerApplication;
+      if (!pdfApp?.pdfViewer) {
+        return;
+      }
+      pdfApp.page = resolvedPage;
+      pdfApp.pdfViewer.scrollPageIntoView({
+        pageNumber: resolvedPage,
+        destArray: [null, { name: "XYZ" }, 0, citation.yOffset ?? null, null],
+        allowNegativeOffset: false,
+        ignoreDestinationZoom: false,
+      });
     } catch (error: any) {
       Zotero.logError(error);
     }
