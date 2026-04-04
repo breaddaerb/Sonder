@@ -664,13 +664,12 @@ The two branches (has range / no range) in `handlePageRangeConfig()` (lines 1285
 
 Existing tests cover: types/model helpers, SQLite storage CRUD, insight markers, custom API provider helpers. Missing coverage for the most complex and fragile modules:
 
-- [ ] Add tests for `paperRetrieval.ts` — `chunkByPage()`, `chunkByPageFromText()`, `chunkLinesWithPosition()`, `filterChunksByPageRange()`, `buildPaperGroundedUserMessage()`, `buildItemPaperGroundedUserMessage()`
-  - These are pure functions and easy to test
-- [ ] Add tests for `render.ts` — `renderMessageHTML()` with math expressions, code blocks, edge cases
-- [ ] Add tests for `chatMessages.ts` — `toChatHistory()` filtering
-- [ ] Add tests for `Meet/OpenAI.ts` — `parseOpenAIText()`, `parseCodexStream()`, `buildCodexInput()`
-  - Also pure functions, critical for correctness
-- [ ] Add tests for `Meet/CodexOAuth.ts` — `parseAuthorizationInput()`, `getCodexAccountId()`
+- [x] Tests for `paperRetrieval.ts` — already covered in `context-chat-model.test.ts`
+- [x] Tests for `render.ts` — already covered in `context-chat-model.test.ts`
+- [x] Tests for `chatMessages.ts` — already covered in `context-chat-model.test.ts`
+- [x] Add tests for `Meet/OpenAI.ts` — `parseOpenAIText()`, `parseCodexStream()`, `buildCodexInput()`, `formatTransportError()` in `transport-parsing.test.ts`
+- [x] Add tests for `Meet/CodexOAuth.ts` — `parseAuthorizationInput()` in `codex-oauth-parsing.test.ts`
+  - `getCodexAccountId()` uses `window.atob` (browser-only), skipped in Node tests
 
 ### 19.10 Minor issues
 
