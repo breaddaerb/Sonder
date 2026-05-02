@@ -1,7 +1,7 @@
 # Sonder TODO
 
 Status: paper-grounded panel chat in progress  
-Last updated: 2026-03-12
+Last updated: 2026-05-02
 
 This file turns `docs/context-chat-spec-v0.1.md` into an implementation-oriented task list.
 
@@ -686,3 +686,16 @@ Existing tests cover: types/model helpers, SQLite storage CRUD, insight markers,
 - [x] `Meet/OpenAI.ts` `requestArg.remove` issue — moot, removed in 19.1
 - [x] `todo.md` Phase 6 stale checkboxes — updated
 - [x] `Meet/state.ts` `SonderMeetState.lock` and `SonderMeetState.input` fields appear unused outside the dead embedding flow — removed in 19.3
+
+---
+
+## 20. Zotero 9 compatibility
+
+- [x] Bump add-on manifest compatibility from Zotero `8.*` to `9.*`
+- [x] Make SQLite module loading compatible with Zotero 8/9 ESM (`Sqlite.sys.mjs`) while retaining older `.jsm` fallback
+- [ ] Smoke test installed XPI in Zotero 9.0.2
+  - [ ] Add-on accepted by Add-ons manager
+  - [ ] Panel opens from Tools menu
+  - [ ] Reader Chat button appears for PDF/snapshot
+  - [ ] SQLite-backed session persists
+  - [ ] PDF extraction and citation chips still work

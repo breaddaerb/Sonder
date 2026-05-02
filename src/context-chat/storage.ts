@@ -51,15 +51,28 @@ export class ContextChatStore {
   }
 
   private getSqliteModule() {
+    const ChromeUtils = (globalThis as any).ChromeUtils;
+
+    // Zotero 8+ follows Firefox's ESM migration and exposes Sqlite as a
+    // .sys.mjs module. Keep the .jsm fallback for older Zotero runtimes.
     try {
-      const imported = (globalThis as any).ChromeUtils?.import?.("resource://gre/modules/Sqlite.jsm");
+      const imported = ChromeUtils?.importESModule?.("resource://gre/modules/Sqlite.sys.mjs");
       if (imported?.Sqlite?.openConnection) {
         return imported.Sqlite;
       }
     } catch {
       // fall through
     }
-    throw new Error("Sqlite.jsm is unavailable in current Zotero runtime.");
+
+    try {
+      const imported = ChromeUtils?.import?.("resource://gre/modules/Sqlite.jsm");
+      if (imported?.Sqlite?.openConnection) {
+        return imported.Sqlite;
+      }
+    } catch {
+      // fall through
+    }
+    throw new Error("Sqlite module is unavailable in current Zotero runtime.");
   }
 
   private getRowValue<T>(row: any, columnName: string): T {

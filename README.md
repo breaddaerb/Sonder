@@ -37,6 +37,8 @@ Build output:
 
 ## Install in Zotero
 
+Sonder is packaged for Zotero 7/8/9-style bootstrap add-ons and currently declares compatibility through Zotero 9.x.
+
 Open Zotero:
 
 - `Tools -> Add-ons`
